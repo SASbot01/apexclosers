@@ -1,0 +1,14 @@
+{
+  "name": "apex-whatsapp-worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Worker WhatsApp (Baileys) — vincula por QR el número del closer y enруta mensajes a la app. Servicio SIEMPRE ENCENDIDO (no Vercel).",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "express": "^4.19.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.4"
+  }
+}

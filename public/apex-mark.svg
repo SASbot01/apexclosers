@@ -1,0 +1,20 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="APEX">
+  <title>APEX — Mono (White, for dark backgrounds)</title>
+  <defs>
+    <linearGradient id="whiteFace1" x1="20" y1="20" x2="50" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D5D5DA"/>
+    </linearGradient>
+    <linearGradient id="whiteFace2" x1="50" y1="8" x2="92" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C8C8CD"/>
+      <stop offset="100%" stop-color="#86868D"/>
+    </linearGradient>
+    <linearGradient id="whiteFace3" x1="50" y1="55" x2="50" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5C5C64"/>
+      <stop offset="100%" stop-color="#2A2A30"/>
+    </linearGradient>
+  </defs>
+  <path d="M 50 8 L 8 88 L 50 55 Z" fill="url(#whiteFace1)"/>
+  <path d="M 50 8 L 50 55 L 92 88 Z" fill="url(#whiteFace2)"/>
+  <path d="M 50 55 L 8 88 L 50 70 L 92 88 Z" fill="url(#whiteFace3)"/>
+</svg>

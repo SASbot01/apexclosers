@@ -1,0 +1,20 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="APEX">
+  <title>APEX — Mono (Black)</title>
+  <defs>
+    <linearGradient id="monoFace1" x1="20" y1="20" x2="50" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2E2E36"/>
+      <stop offset="100%" stop-color="#14141A"/>
+    </linearGradient>
+    <linearGradient id="monoFace2" x1="50" y1="8" x2="92" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1A1A20"/>
+      <stop offset="100%" stop-color="#06060B"/>
+    </linearGradient>
+    <linearGradient id="monoFace3" x1="50" y1="55" x2="50" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0A0A10"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <path d="M 50 8 L 8 88 L 50 55 Z" fill="url(#monoFace1)"/>
+  <path d="M 50 8 L 50 55 L 92 88 Z" fill="url(#monoFace2)"/>
+  <path d="M 50 55 L 8 88 L 50 70 L 92 88 Z" fill="url(#monoFace3)"/>
+</svg>

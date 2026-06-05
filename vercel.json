@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/recall?action=reconcile-stuck", "schedule": "*/5 * * * *" }
+  ],
+  "functions": {
+    "api/recall.js": { "maxDuration": 60 }
+  }
+}

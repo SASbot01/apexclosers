@@ -1,0 +1,1040 @@
+/* APEX Theme PDR v2.0 · Hybrid · Cinematic Edition
+ * 4 themes: dark (default) · light · obsidian · pizarra
+ * Scoped under .apex-ops to prevent leaking into other tenants.
+ * Theme tokens are redefined per [data-theme]; components reference vars
+ * and re-themed automatically without changes. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 1 · Theme-agnostic base (type, ease, base layout)
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops {
+  --apex-font:      'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --apex-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --apex-ease-editorial: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --apex-ease-ambient:   cubic-bezier(0.16, 1, 0.3, 1);
+
+  position: relative;
+  min-height: 100vh;
+  background: var(--apex-bg-deep);
+  color: var(--apex-plat-mid);
+  font-family: var(--apex-font);
+  font-weight: 300;
+  font-size: 13.5px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color 0.4s var(--apex-ease-editorial),
+              color 0.4s var(--apex-ease-editorial);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 2 · Theme tokens — DARK (default)
+ *     Flow Platinum on OLED — the locked APEX brand
+ * ───────────────────────────────────────────────────────────────────────── */
+/* Force html+body to match the active apex-ops bg so iOS PWA standalone mode
+   doesn't show a white sliver above the topbar (the area under the notch).
+   `:has()` selector cleanly scopes this to pages where apex-ops is mounted. */
+html:has(.apex-ops),
+body:has(.apex-ops) {
+  background: #06070A;
+}
+html:has(.apex-ops[data-theme="light"]),
+body:has(.apex-ops[data-theme="light"]) {
+  background: #EEF0F3;
+}
+html:has(.apex-ops[data-theme="obsidian"]),
+body:has(.apex-ops[data-theme="obsidian"]) {
+  background: #000000;
+}
+html:has(.apex-ops[data-theme="pizarra"]),
+body:has(.apex-ops[data-theme="pizarra"]) {
+  background: #060606;
+}
+
+.apex-ops,
+.apex-ops[data-theme="dark"] {
+  --apex-bg-deep:    #06070A;
+  --apex-bg:         #0A0B0D;
+  --apex-bg-soft:    #0F1015;
+  --apex-surface:    #13141B;
+  --apex-surface-hi: #1A1C25;
+
+  /* Platinum ramp — hi = highest contrast text, deep = furthest from text */
+  --apex-plat-hi:   #FAFBFE;
+  --apex-plat-mid:  #D5DAE3;
+  --apex-plat-low:  #9AA3B2;
+  --apex-plat-shad: #4A5260;
+  --apex-plat-deep: #1E232C;
+
+  --apex-alpha-1: rgba(255,255,255, 0.02);
+  --apex-alpha-2: rgba(255,255,255, 0.04);
+  --apex-alpha-3: rgba(255,255,255, 0.06);
+  --apex-alpha-4: rgba(255,255,255, 0.12);
+
+  --apex-border:        rgba(154, 163, 178, 0.18);
+  --apex-border-strong: rgba(154, 163, 178, 0.28);
+  --apex-border-soft:   rgba(154, 163, 178, 0.10);
+
+  --apex-card-bg:    linear-gradient(180deg, #11131A 0%, #0E1014 55%, #0B0D12 100%);
+  --apex-card-sheen: linear-gradient(180deg, rgba(213, 218, 227, 0.04), transparent);
+  --apex-inset-top: rgba(255, 255, 255, 0.055);
+  --apex-inset-bot: rgba(0, 0, 0, 0.5);
+  --apex-anchor:    rgba(0, 0, 0, 0.55);
+
+  --apex-panel-bg:     #0C0D12;
+  --apex-trigger-bg:   rgba(10, 11, 13, 0.65);
+  --apex-trigger-bg-h: rgba(20, 22, 30, 0.85);
+
+  --apex-status-pos: #6FCF9C;
+  --apex-status-neg: #E58371;
+
+  --apex-chart-line-1: #4A5260;
+  --apex-chart-line-2: #D5DAE3;
+  --apex-chart-line-3: #FAFBFE;
+  --apex-chart-area-1: rgba(213, 218, 227, 0.22);
+  --apex-chart-area-2: rgba(154, 163, 178, 0.05);
+  --apex-chart-grid:   rgba(154, 163, 178, 0.07);
+  --apex-chart-axis:   rgba(154, 163, 178, 0.5);
+  --apex-chart-tick:   rgba(154, 163, 178, 0.6);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 3 · Theme tokens — LIGHT
+ *     Inverse APEX. Same brand grammar, white surface, dark platinum.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops[data-theme="light"] {
+  --apex-bg-deep:    #EEF0F3;
+  --apex-bg:         #F5F6F9;
+  --apex-bg-soft:    #FAFAFC;
+  --apex-surface:    #FFFFFF;
+  --apex-surface-hi: #F8F9FB;
+
+  /* Inverted: hi = darkest (primary text), deep = lightest (faint) */
+  --apex-plat-hi:   #0A0B0D;
+  --apex-plat-mid:  #2D2E32;
+  --apex-plat-low:  #71717A;
+  --apex-plat-shad: #A5A8AE;
+  --apex-plat-deep: #DDE0E5;
+
+  --apex-alpha-1: rgba(0,0,0, 0.02);
+  --apex-alpha-2: rgba(0,0,0, 0.04);
+  --apex-alpha-3: rgba(0,0,0, 0.06);
+  --apex-alpha-4: rgba(0,0,0, 0.12);
+
+  --apex-border:        rgba(10, 11, 20, 0.12);
+  --apex-border-strong: rgba(10, 11, 20, 0.22);
+  --apex-border-soft:   rgba(10, 11, 20, 0.06);
+
+  --apex-card-bg:    linear-gradient(180deg, #FFFFFF 0%, #FCFCFE 55%, #F4F5F8 100%);
+  --apex-card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent);
+  --apex-inset-top: rgba(255, 255, 255, 0.95);
+  --apex-inset-bot: rgba(10, 11, 20, 0.05);
+  --apex-anchor:    rgba(10, 11, 20, 0.07);
+
+  --apex-panel-bg:     #FFFFFF;
+  --apex-trigger-bg:   rgba(255, 255, 255, 0.8);
+  --apex-trigger-bg-h: #F4F5F8;
+
+  --apex-status-pos: #2A9D5F;
+  --apex-status-neg: #C24A38;
+
+  --apex-chart-line-1: #B0B5BD;
+  --apex-chart-line-2: #4A5260;
+  --apex-chart-line-3: #0A0B0D;
+  --apex-chart-area-1: rgba(10, 11, 20, 0.10);
+  --apex-chart-area-2: rgba(10, 11, 20, 0.02);
+  --apex-chart-grid:   rgba(10, 11, 20, 0.06);
+  --apex-chart-axis:   rgba(10, 11, 20, 0.5);
+  --apex-chart-tick:   rgba(10, 11, 20, 0.55);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 4 · Theme tokens — OBSIDIAN
+ *     Pure black & white. No color anywhere, not even on status.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops[data-theme="obsidian"] {
+  --apex-bg-deep:    #000000;
+  --apex-bg:         #000000;
+  --apex-bg-soft:    #050505;
+  --apex-surface:    #0A0A0A;
+  --apex-surface-hi: #111111;
+
+  --apex-plat-hi:   #FFFFFF;
+  --apex-plat-mid:  #D0D0D0;
+  --apex-plat-low:  #888888;
+  --apex-plat-shad: #555555;
+  --apex-plat-deep: #222222;
+
+  --apex-alpha-1: rgba(255,255,255, 0.02);
+  --apex-alpha-2: rgba(255,255,255, 0.05);
+  --apex-alpha-3: rgba(255,255,255, 0.08);
+  --apex-alpha-4: rgba(255,255,255, 0.16);
+
+  --apex-border:        rgba(255, 255, 255, 0.15);
+  --apex-border-strong: rgba(255, 255, 255, 0.30);
+  --apex-border-soft:   rgba(255, 255, 255, 0.08);
+
+  --apex-card-bg:    linear-gradient(180deg, #0C0C0C 0%, #060606 55%, #000000 100%);
+  --apex-card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
+  --apex-inset-top: rgba(255, 255, 255, 0.07);
+  --apex-inset-bot: rgba(0, 0, 0, 0.6);
+  --apex-anchor:    rgba(0, 0, 0, 0.6);
+
+  --apex-panel-bg:     #050505;
+  --apex-trigger-bg:   rgba(8, 8, 8, 0.7);
+  --apex-trigger-bg-h: #161616;
+
+  /* Status: same monochrome, only direction (arrow) differentiates */
+  --apex-status-pos: #FFFFFF;
+  --apex-status-neg: #888888;
+
+  --apex-chart-line-1: #444444;
+  --apex-chart-line-2: #BBBBBB;
+  --apex-chart-line-3: #FFFFFF;
+  --apex-chart-area-1: rgba(255, 255, 255, 0.16);
+  --apex-chart-area-2: rgba(255, 255, 255, 0.03);
+  --apex-chart-grid:   rgba(255, 255, 255, 0.06);
+  --apex-chart-axis:   rgba(255, 255, 255, 0.45);
+  --apex-chart-tick:   rgba(255, 255, 255, 0.55);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 5 · Theme tokens — PIZARRA (BLACK chalkboard)
+ *     Deep black ground, chalk-cream text, colored chalk metrics + funnel.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops[data-theme="pizarra"] {
+  --apex-bg-deep:    #060606;
+  --apex-bg:         #0A0A0A;
+  --apex-bg-soft:    #0E0E0E;
+  --apex-surface:    #121212;
+  --apex-surface-hi: #161616;
+
+  --apex-plat-hi:   #F8F4E3;
+  --apex-plat-mid:  #DDD4B8;
+  --apex-plat-low:  #B0A88A;
+  --apex-plat-shad: #6F6850;
+  --apex-plat-deep: #2B2A23;
+
+  --apex-alpha-1: rgba(245, 244, 227, 0.025);
+  --apex-alpha-2: rgba(245, 244, 227, 0.05);
+  --apex-alpha-3: rgba(245, 244, 227, 0.08);
+  --apex-alpha-4: rgba(245, 244, 227, 0.16);
+
+  --apex-border:        rgba(245, 244, 227, 0.18);
+  --apex-border-strong: rgba(245, 244, 227, 0.34);
+  --apex-border-soft:   rgba(245, 244, 227, 0.10);
+
+  --apex-card-bg:    linear-gradient(180deg, #181818 0%, #0E0E0E 55%, #050505 100%);
+  --apex-card-sheen: linear-gradient(180deg, rgba(245, 244, 227, 0.045), transparent);
+  --apex-inset-top: rgba(245, 244, 227, 0.07);
+  --apex-inset-bot: rgba(0, 0, 0, 0.55);
+  --apex-anchor:    rgba(0, 0, 0, 0.6);
+
+  --apex-panel-bg:     #0B0B0B;
+  --apex-trigger-bg:   rgba(12, 12, 12, 0.78);
+  --apex-trigger-bg-h: rgba(28, 28, 28, 0.88);
+
+  --apex-status-pos: #B4DD9C;
+  --apex-status-neg: #F4A8A8;
+
+  /* Chart line uses warm chalk-yellow against the black slate */
+  --apex-chart-line-1: #7C7458;
+  --apex-chart-line-2: #DDD4B8;
+  --apex-chart-line-3: #F4D35E;
+  --apex-chart-area-1: rgba(244, 211, 94, 0.20);
+  --apex-chart-area-2: rgba(245, 244, 227, 0.04);
+  --apex-chart-grid:   rgba(245, 244, 227, 0.07);
+  --apex-chart-axis:   rgba(245, 244, 227, 0.5);
+  --apex-chart-tick:   rgba(245, 244, 227, 0.55);
+}
+
+/* Pizarra · funnel bars in chalk colors per stage. */
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="opt_ins"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(244, 211, 94, 0.25), rgba(244, 211, 94, 0.70) 50%, rgba(244, 211, 94, 0.25));
+  border-left-color:  rgba(244, 211, 94, 0.45);
+  border-right-color: rgba(244, 211, 94, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="contacted"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(180, 221, 156, 0.25), rgba(180, 221, 156, 0.70) 50%, rgba(180, 221, 156, 0.25));
+  border-left-color:  rgba(180, 221, 156, 0.45);
+  border-right-color: rgba(180, 221, 156, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_offered"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(138, 200, 224, 0.25), rgba(138, 200, 224, 0.70) 50%, rgba(138, 200, 224, 0.25));
+  border-left-color:  rgba(138, 200, 224, 0.45);
+  border-right-color: rgba(138, 200, 224, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_scheduled"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(244, 166, 184, 0.25), rgba(244, 166, 184, 0.70) 50%, rgba(244, 166, 184, 0.25));
+  border-left-color:  rgba(244, 166, 184, 0.45);
+  border-right-color: rgba(244, 166, 184, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_showed"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(242, 167, 101, 0.25), rgba(242, 167, 101, 0.70) 50%, rgba(242, 167, 101, 0.25));
+  border-left-color:  rgba(242, 167, 101, 0.45);
+  border-right-color: rgba(242, 167, 101, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="closes"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(242, 133, 138, 0.25), rgba(242, 133, 138, 0.70) 50%, rgba(242, 133, 138, 0.25));
+  border-left-color:  rgba(242, 133, 138, 0.45);
+  border-right-color: rgba(242, 133, 138, 0.45);
+}
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="upsell"] .apex-funnel-bar {
+  background: linear-gradient(90deg, rgba(200, 162, 224, 0.25), rgba(200, 162, 224, 0.70) 50%, rgba(200, 162, 224, 0.25));
+  border-left-color:  rgba(200, 162, 224, 0.45);
+  border-right-color: rgba(200, 162, 224, 0.45);
+}
+/* Funnel value number in pizarra picks up the same chalk hue as the bar. */
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="opt_ins"]         .apex-funnel-num { color: #F4D35E; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="contacted"]       .apex-funnel-num { color: #B4DD9C; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_offered"]   .apex-funnel-num { color: #8AC8E0; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_scheduled"] .apex-funnel-num { color: #F4A6B8; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_showed"]    .apex-funnel-num { color: #F2A765; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="closes"]          .apex-funnel-num { color: #F2858A; }
+.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="upsell"]          .apex-funnel-num { color: #C8A2E0; }
+
+/* Pizarra · Reports funnel bars in chalk colors per stage index. The Reports
+   funnel uses dynamic role-specific stages, so we key off the index (0..4)
+   instead of the stage name. Mirrors the Home funnel palette. */
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="0"] .apex-reports-funnel-bar {
+  background: linear-gradient(90deg, rgba(244, 211, 94, 0.30), rgba(244, 211, 94, 0.85) 50%, rgba(244, 211, 94, 0.30));
+  border-color: rgba(244, 211, 94, 0.55);
+}
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="1"] .apex-reports-funnel-bar {
+  background: linear-gradient(90deg, rgba(180, 221, 156, 0.30), rgba(180, 221, 156, 0.85) 50%, rgba(180, 221, 156, 0.30));
+  border-color: rgba(180, 221, 156, 0.55);
+}
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="2"] .apex-reports-funnel-bar {
+  background: linear-gradient(90deg, rgba(138, 200, 224, 0.30), rgba(138, 200, 224, 0.85) 50%, rgba(138, 200, 224, 0.30));
+  border-color: rgba(138, 200, 224, 0.55);
+}
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="3"] .apex-reports-funnel-bar {
+  background: linear-gradient(90deg, rgba(244, 166, 184, 0.30), rgba(244, 166, 184, 0.85) 50%, rgba(244, 166, 184, 0.30));
+  border-color: rgba(244, 166, 184, 0.55);
+}
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="4"] .apex-reports-funnel-bar {
+  background: linear-gradient(90deg, rgba(242, 133, 138, 0.30), rgba(242, 133, 138, 0.85) 50%, rgba(242, 133, 138, 0.30));
+  border-color: rgba(242, 133, 138, 0.55);
+}
+/* The big numeric on the right of each row picks up the matching chalk hue. */
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="0"] .apex-reports-funnel-num { color: #F4D35E; }
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="1"] .apex-reports-funnel-num { color: #B4DD9C; }
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="2"] .apex-reports-funnel-num { color: #8AC8E0; }
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="3"] .apex-reports-funnel-num { color: #F4A6B8; }
+.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="4"] .apex-reports-funnel-num { color: #F2858A; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 6 · Type primitives
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-eyebrow {
+  font-family: var(--apex-font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--apex-plat-low);
+}
+.apex-ops .apex-label {
+  font-family: var(--apex-font-mono);
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--apex-plat-low);
+}
+.apex-ops .apex-mono {
+  font-family: var(--apex-font-mono);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.apex-ops .apex-display {
+  font-family: var(--apex-font);
+  font-weight: 200;
+  font-size: 88px;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-h1 {
+  font-family: var(--apex-font);
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.0;
+  letter-spacing: -0.025em;
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-h2 {
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-h3 {
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-stat {
+  font-family: var(--apex-font);
+  font-weight: 200;
+  font-size: 36px;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--apex-plat-hi);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 7 · Card surface — solid material with edge lighting
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-card {
+  position: relative;
+  /* isolation creates a fresh stacking context for the card so the ::before
+     sheen (z-index: -1) stays *inside* it but below content — without forcing
+     every direct child into its own stacking context (which would put the
+     chart SVG above any sibling dropdown panel via tree order). */
+  isolation: isolate;
+  background: var(--apex-card-bg);
+  border: 1px solid var(--apex-border);
+  border-radius: 0;
+  padding: 24px;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot),
+    0 1px 0 var(--apex-anchor);
+  transition: transform 0.4s var(--apex-ease-editorial),
+              border-color 0.4s var(--apex-ease-editorial),
+              box-shadow 0.4s var(--apex-ease-editorial),
+              background 0.4s var(--apex-ease-editorial);
+}
+.apex-ops .apex-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 90px;
+  background: var(--apex-card-sheen);
+  pointer-events: none;
+  z-index: -1;
+}
+.apex-ops .apex-card:hover {
+  border-color: var(--apex-border-strong);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8y · Layout vars + safe-area for PWA
+ *      --apex-topbar-h = total topbar height (padding + content + safe-area).
+ *      Components that sit below topbar (FloatingHeader, sidebar, etc.)
+ *      reference this so they always start at the right offset.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops {
+  --apex-topbar-h-base: 52px;
+  --apex-topbar-h: calc(var(--apex-topbar-h-base) + env(safe-area-inset-top, 0px));
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8x · HoverMenu shared styles (root, trigger, panel, items)
+ *      Hosted here (not in the HoverMenu component's inline <style>) so that
+ *      ThemePicker + MobileSectionMenu — which use these classes but don't
+ *      render the HoverMenu component itself — never lose their styling when
+ *      no HoverMenu instance is mounted on the page.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-hover-trigger {
+  background: var(--apex-trigger-bg);
+  border: 1px solid var(--apex-border);
+  border-radius: 0;
+  padding: 9px 14px;
+  display: inline-flex; align-items: center; gap: 10px;
+  color: var(--apex-plat-mid);
+  font-family: var(--apex-font);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot);
+  transition: border-color 0.2s var(--apex-ease-editorial),
+              background 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-hover-trigger:hover,
+.apex-ops .apex-hover-trigger[data-open] {
+  border-color: var(--apex-border-strong);
+  background: var(--apex-trigger-bg-h);
+}
+.apex-ops .apex-hover-trigger-label {
+  font-family: var(--apex-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--apex-plat-low);
+}
+.apex-ops .apex-hover-trigger-value {
+  color: var(--apex-plat-hi);
+  font-weight: 400;
+}
+
+.apex-ops .apex-hover-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  background: var(--apex-panel-bg);
+  border: 1px solid var(--apex-border-strong);
+  border-radius: 0;
+  padding: 6px 0;
+  z-index: 500;
+  max-height: min(50vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    0 1px 0 var(--apex-anchor),
+    0 16px 40px rgba(0, 0, 0, 0.45);
+  animation: apex-pop 0.18s var(--apex-ease-editorial);
+}
+.apex-ops .apex-hover-panel--sub {
+  max-height: min(50vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.apex-ops .apex-hover-panel::-webkit-scrollbar,
+.apex-ops .apex-hover-panel--sub::-webkit-scrollbar { width: 10px; }
+.apex-ops .apex-hover-panel::-webkit-scrollbar-track,
+.apex-ops .apex-hover-panel--sub::-webkit-scrollbar-track { background: transparent; }
+.apex-ops .apex-hover-panel::-webkit-scrollbar-thumb,
+.apex-ops .apex-hover-panel--sub::-webkit-scrollbar-thumb {
+  background: var(--apex-border-strong);
+  border: 2px solid var(--apex-panel-bg);
+  border-radius: 0;
+}
+.apex-ops .apex-hover-panel::-webkit-scrollbar-thumb:hover,
+.apex-ops .apex-hover-panel--sub::-webkit-scrollbar-thumb:hover { background: var(--apex-plat-low); }
+.apex-ops .apex-hover-panel,
+.apex-ops .apex-hover-panel--sub {
+  scrollbar-width: thin;
+  scrollbar-color: var(--apex-border-strong) transparent;
+}
+.apex-ops .apex-hover-panel::after {
+  content: '';
+  position: sticky;
+  bottom: 0; left: 0; right: 0;
+  display: block;
+  height: 16px;
+  margin-top: -16px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--apex-panel-bg));
+}
+.apex-ops .apex-hover-panel[data-align="left"] .apex-hover-panel--sub  { left: 100%; margin-left: 2px; }
+.apex-ops .apex-hover-panel[data-align="right"] .apex-hover-panel--sub { right: 100%; margin-right: 2px; }
+
+@keyframes apex-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.apex-ops .apex-hover-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 9px 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--apex-plat-mid);
+  font-family: var(--apex-font);
+  font-size: 12.5px;
+  font-weight: 300;
+  letter-spacing: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s var(--apex-ease-editorial),
+              color 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-hover-item:hover {
+  background: var(--apex-alpha-2);
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-hover-item[data-selected] {
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-hover-sep {
+  height: 1px;
+  background: var(--apex-alpha-3);
+  margin: 4px 0;
+}
+.apex-ops .apex-hover-header {
+  padding: 8px 16px 4px;
+  font-size: 9.5px;
+  color: var(--apex-plat-shad);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8v · Modal shell — shared by CrmNewContactModal, CrmSmartViewModal, etc.
+ *      Hosted globally so swapping which modal is mounted doesn't lose
+ *      styling. Modal-specific bits stay in each component's <style>.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 650;
+}
+/* `.apex-modal-center` is the fixed full-screen flex wrapper. Centers any
+   .apex-modal-shell horizontally + vertically WITHOUT relying on CSS
+   transform — which would conflict with framer-motion's animation transforms
+   on the shell itself (the previous `top: 8vh; transform: translateX(-50%)`
+   pattern got overwritten by the inline transform from `initial={{ y: 12 }}`
+   and the modal drifted off-center). pointer-events lets background clicks
+   reach the backdrop element for outside-click close. */
+.apex-ops .apex-modal-center {
+  position: fixed; inset: 0;
+  z-index: 651;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+}
+.apex-ops .apex-modal-center > * { pointer-events: auto; }
+.apex-ops .apex-modal-shell {
+  width: min(540px, 92vw);
+  max-height: 84vh;
+  display: flex; flex-direction: column;
+}
+.apex-ops .apex-modal {
+  display: flex; flex-direction: column;
+  background: var(--apex-card-bg);
+  border: 1px solid var(--apex-border-strong);
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot),
+    0 32px 64px rgba(0, 0, 0, 0.55);
+  max-height: 84vh;
+}
+.apex-ops .apex-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--apex-border-soft);
+}
+.apex-ops .apex-modal-head-left { display: inline-flex; align-items: center; gap: 8px; color: var(--apex-plat-mid); }
+.apex-ops .apex-modal-title {
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--apex-plat-hi);
+  letter-spacing: -0.015em;
+}
+.apex-ops .apex-modal-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid var(--apex-border);
+  border-radius: 0;
+  color: var(--apex-plat-low);
+  cursor: pointer;
+  transition: color 0.2s var(--apex-ease-editorial),
+              border-color 0.2s var(--apex-ease-editorial),
+              background 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-modal-close:hover {
+  color: var(--apex-plat-hi);
+  border-color: var(--apex-border-strong);
+  background: var(--apex-alpha-2);
+}
+
+.apex-ops .apex-modal-body {
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto;
+}
+.apex-ops .apex-modal-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.apex-ops .apex-modal-field {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.apex-ops .apex-modal-input {
+  background: var(--apex-trigger-bg);
+  border: 1px solid var(--apex-border);
+  border-radius: 0;
+  padding: 9px 11px;
+  font-family: var(--apex-font);
+  font-size: 13px;
+  color: var(--apex-plat-hi);
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot);
+  transition: border-color 0.2s var(--apex-ease-editorial),
+              background 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-modal-input:focus { border-color: var(--apex-border-strong); background: var(--apex-trigger-bg-h); }
+.apex-ops .apex-modal-input::placeholder { color: var(--apex-plat-shad); }
+.apex-ops .apex-modal-textarea { resize: vertical; min-height: 64px; }
+
+.apex-ops .apex-modal-foot {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid var(--apex-border-soft);
+}
+.apex-ops .apex-modal-btn {
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 12.5px;
+  padding: 9px 18px;
+  border-radius: 0;
+  border: 1px solid var(--apex-plat-mid);
+  background: var(--apex-plat-mid);
+  color: var(--apex-bg);
+  cursor: pointer;
+  transition: background 0.2s var(--apex-ease-editorial),
+              color 0.2s var(--apex-ease-editorial),
+              border-color 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-modal-btn:hover:not(:disabled) { background: var(--apex-plat-hi); border-color: var(--apex-plat-hi); }
+.apex-ops .apex-modal-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.apex-ops .apex-modal-btn--ghost {
+  background: transparent;
+  color: var(--apex-plat-mid);
+  border-color: var(--apex-border-strong);
+}
+/* Compound selector (.apex-modal-btn.apex-modal-btn--ghost) so it matches
+   the specificity of `.apex-modal-btn:hover:not(:disabled)` above AND wins
+   the cascade order — otherwise the base hover (background → plat-hi white,
+   color → bg dark inverted) kicks in on the Cancel button and we get a
+   white block whose ghost-class color override (plat-hi white) renders
+   invisible on top. */
+.apex-ops .apex-modal-btn.apex-modal-btn--ghost:hover:not(:disabled) {
+  background: var(--apex-trigger-bg-h);
+  color: var(--apex-plat-hi);
+  border-color: var(--apex-border-strong);
+}
+
+@media (max-width: 540px) {
+  .apex-ops .apex-modal-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8u · View switcher (segmented pills with icon + label)
+ *      Used by CrmViewSwitcher in Leads and SalesTabSwitcher in Sales.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-crm-vs {
+  display: inline-flex; align-items: center;
+  background: var(--apex-trigger-bg);
+  border: 1px solid var(--apex-border);
+  padding: 2px;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot);
+}
+.apex-ops .apex-crm-vs-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 7px 12px;
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--apex-plat-low);
+  cursor: pointer;
+  transition: background 0.2s var(--apex-ease-editorial),
+              color 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-crm-vs-btn:hover { color: var(--apex-plat-mid); background: var(--apex-alpha-2); }
+.apex-ops .apex-crm-vs-btn[data-active] {
+  background: var(--apex-plat-mid);
+  color: var(--apex-bg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8w · Pills · segmented control
+ *      Shared by CrmTasksToolbar and CrmChatToolbar — hosted globally so the
+ *      pills stay styled when the toolbar swaps between Tasks ↔ Chat.
+ *      Class names kept (apex-crm-tasks-status*) for now since both toolbars
+ *      reference them; treat as a generic "apex-pills" pattern.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-crm-tasks-status {
+  display: inline-flex; align-items: center;
+  background: var(--apex-trigger-bg);
+  border: 1px solid var(--apex-border);
+  padding: 2px;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot);
+}
+.apex-ops .apex-crm-tasks-status-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 7px 12px;
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--apex-plat-low);
+  cursor: pointer;
+  transition: background 0.2s var(--apex-ease-editorial),
+              color 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-crm-tasks-status-btn:hover {
+  color: var(--apex-plat-mid);
+  background: var(--apex-alpha-2);
+}
+.apex-ops .apex-crm-tasks-status-btn[data-active] {
+  background: var(--apex-plat-mid);
+  color: var(--apex-bg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8z · Shared search input (used by CRM filter bar + tasks toolbar)
+ *      Defined here (not per-component) so swapping between toolbars
+ *      doesn't unmount the styles.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-crm-search {
+  position: relative;
+  display: inline-flex; align-items: center;
+}
+.apex-ops .apex-crm-search-icon {
+  position: absolute; left: 10px;
+  color: var(--apex-plat-low);
+  pointer-events: none;
+}
+.apex-ops .apex-crm-search-input {
+  background: var(--apex-trigger-bg);
+  border: 1px solid var(--apex-border);
+  border-radius: 0;
+  padding: 8px 12px 8px 30px;
+  width: 240px;
+  font-family: var(--apex-font);
+  font-size: 12.5px;
+  color: var(--apex-plat-hi);
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot);
+  transition: border-color 0.2s var(--apex-ease-editorial),
+              background 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-crm-search-input::placeholder { color: var(--apex-plat-shad); }
+.apex-ops .apex-crm-search-input:focus {
+  border-color: var(--apex-border-strong);
+  background: var(--apex-trigger-bg-h);
+}
+@media (max-width: 720px) {
+  .apex-ops .apex-crm-search-input { width: 100%; max-width: 220px; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8a · Delta badge — direction-based status indicator
+ *      Used by KpiTiles + SecondaryKpis (shared via DeltaBadge component).
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-delta {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--apex-font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--apex-status-neg);
+  width: max-content;
+}
+.apex-ops .apex-delta[data-up] {
+  color: var(--apex-status-pos);
+}
+.apex-ops .apex-delta svg {
+  width: 15px; height: 15px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 8 · Hairline divider
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--apex-border-strong) 18%, var(--apex-border-strong) 82%, transparent);
+  border: 0;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 9 · Buttons (sharp · platinum)
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-btn {
+  font-family: var(--apex-font);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  padding: 11px 18px;
+  border-radius: 0;
+  cursor: pointer;
+  background: transparent;
+  color: var(--apex-plat-mid);
+  border: 1px solid var(--apex-plat-shad);
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background 0.2s var(--apex-ease-editorial),
+              color 0.2s var(--apex-ease-editorial),
+              border-color 0.2s var(--apex-ease-editorial);
+}
+.apex-ops .apex-btn:hover {
+  background: var(--apex-plat-hi);
+  color: var(--apex-bg);
+  border-color: var(--apex-plat-hi);
+}
+.apex-ops .apex-btn--primary {
+  background: var(--apex-plat-hi);
+  color: var(--apex-bg);
+  border-color: var(--apex-plat-hi);
+}
+.apex-ops .apex-btn--primary:hover {
+  background: transparent;
+  color: var(--apex-plat-hi);
+}
+.apex-ops .apex-btn--ghost {
+  border-color: transparent;
+  color: var(--apex-plat-low);
+}
+.apex-ops .apex-btn--ghost:hover {
+  background: var(--apex-alpha-2);
+  color: var(--apex-plat-hi);
+  border-color: var(--apex-alpha-4);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 10 · Atmospheric canvas — visibility per theme
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops[data-theme="light"] .apex-atmosphere,
+.apex-ops[data-theme="light"] .apex-grain-layer,
+.apex-ops[data-theme="obsidian"] .apex-atmosphere,
+.apex-ops[data-theme="obsidian"] .apex-grain-layer,
+.apex-ops[data-theme="pizarra"] .apex-atmosphere {
+  display: none;
+}
+/* Pizarra keeps the grain (chalk-dust feel), screen-blended */
+.apex-ops[data-theme="pizarra"] .apex-grain-layer {
+  opacity: 0.08;
+  mix-blend-mode: screen;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 11 · Atmospheric canvas keyframes
+ * ───────────────────────────────────────────────────────────────────────── */
+@keyframes apex-nebula-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%      { transform: scale(1.25); opacity: 1.0; }
+}
+@keyframes apex-twinkle-a {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 0.15; }
+}
+@keyframes apex-twinkle-b {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.7; }
+}
+@keyframes apex-grain {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(-2%, 1%); }
+  40%  { transform: translate(1%, -2%); }
+  60%  { transform: translate(-1%, 2%); }
+  80%  { transform: translate(2%, -1%); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apex-ops .apex-nebula,
+  .apex-ops .apex-stars-a,
+  .apex-ops .apex-stars-b,
+  .apex-ops .apex-grain-layer {
+    animation: none !important;
+  }
+  .apex-ops .apex-card {
+    transition: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 12 · Scrollbar
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops ::-webkit-scrollbar { width: 6px; height: 6px; }
+.apex-ops ::-webkit-scrollbar-thumb {
+  background: var(--apex-border);
+  border-radius: 0;
+}
+.apex-ops ::-webkit-scrollbar-thumb:hover { background: var(--apex-border-strong); }
+.apex-ops ::-webkit-scrollbar-track { background: transparent; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 13 · Shared KPI tile system — used by Home's KpiTiles AND Reports'
+ *      ReportsKpiStrip. Lives globally so the styles are available no
+ *      matter which page mounts first (Home or Reports). Per-page tweaks
+ *      (column count, role-specific dividers) stay in component styles.
+ * ───────────────────────────────────────────────────────────────────────── */
+.apex-ops .apex-kpi-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  background: var(--apex-card-bg);
+  border: 1px solid var(--apex-border);
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    inset 0 -1px 0 var(--apex-inset-bot),
+    0 1px 0 var(--apex-anchor);
+}
+.apex-ops .apex-kpi-grid::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0;
+  height: 90px;
+  background: var(--apex-card-sheen);
+  pointer-events: none;
+}
+.apex-ops .apex-kpi {
+  position: relative;
+  padding: 20px 22px 18px;
+  background: transparent;
+  border: 0 !important;
+  border-right: 1px solid var(--apex-border-soft) !important;
+  display: flex; flex-direction: column; gap: 12px;
+  justify-content: space-between;
+  min-height: 130px;
+  z-index: 1;
+}
+.apex-ops .apex-kpi:last-child { border-right: 0 !important; }
+.apex-ops .apex-kpi:hover {
+  transform: none;
+  background: var(--apex-alpha-1);
+  box-shadow: none;
+}
+.apex-ops .apex-kpi-row {
+  display: flex; align-items: baseline; gap: 8px;
+  min-height: 36px;
+}
+.apex-ops .apex-stat-num {
+  font-size: 38px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--apex-plat-hi);
+}
+
+/* Pizarra · each KPI value picks up a chalk-palette color by position. */
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(1) .apex-stat-num { color: #F4D35E; }
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(2) .apex-stat-num { color: #B4DD9C; }
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(3) .apex-stat-num { color: #8AC8E0; }
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(4) .apex-stat-num { color: #F4A6B8; }
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(5) .apex-stat-num { color: #F2A765; }
+.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(6) .apex-stat-num { color: #F2858A; }
+
+@media (max-width: 1100px) {
+  .apex-ops .apex-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .apex-ops .apex-kpi:nth-child(3n) { border-right: 0 !important; }
+  .apex-ops .apex-kpi:last-child { border-right: 0 !important; }
+}
+@media (max-width: 640px) {
+  .apex-ops .apex-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .apex-ops .apex-kpi:nth-child(2n) { border-right: 0 !important; }
+  .apex-ops .apex-stat-num { font-size: 30px; }
+}

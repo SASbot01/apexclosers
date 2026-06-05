@@ -1,0 +1,31 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="APEX">
+  <title>APEX — Gold</title>
+  <defs>
+    <!-- Top-left face: brightest champagne, lit from upper-left -->
+    <linearGradient id="goldFace1" x1="20" y1="20" x2="50" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F5DAB0"/>
+      <stop offset="55%" stop-color="#E0BB85"/>
+      <stop offset="100%" stop-color="#A8825A"/>
+    </linearGradient>
+    <!-- Top-right face: warm bronze, partial shadow -->
+    <linearGradient id="goldFace2" x1="50" y1="8" x2="92" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C9A075"/>
+      <stop offset="55%" stop-color="#8E6B45"/>
+      <stop offset="100%" stop-color="#5C432A"/>
+    </linearGradient>
+    <!-- Bottom dart: deep bronze shadow with ambient warmth -->
+    <linearGradient id="goldFace3" x1="50" y1="55" x2="50" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4A3220"/>
+      <stop offset="60%" stop-color="#241810"/>
+      <stop offset="100%" stop-color="#100A06"/>
+    </linearGradient>
+    <linearGradient id="goldSpec" x1="50" y1="8" x2="50" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF2D9" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FFF2D9" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M 50 8 L 8 88 L 50 55 Z" fill="url(#goldFace1)"/>
+  <path d="M 50 8 L 50 55 L 92 88 Z" fill="url(#goldFace2)"/>
+  <path d="M 50 55 L 8 88 L 50 70 L 92 88 Z" fill="url(#goldFace3)"/>
+  <path d="M 50 8 L 50 55" stroke="url(#goldSpec)" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+</svg>
