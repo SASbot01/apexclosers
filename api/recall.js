@@ -262,9 +262,12 @@ async function finalize(req, res) {
   // de pago, cobrado…). NO cuenta en métricas hasta subir justificante y
   // verificarla (api/sales.js).
   let saleCreated = false
-  if (outcomeData?.deal_closed && (Number(outcomeData?.deal_amount) > 0)) {
+  // Creamos la venta si se cerró Y hay importe, O si el estado es de venta
+  // (ganada/deposito) aunque el importe quede a 0 (editable luego en la tabla).
+  const isSaleState = outcomeData?.state === 'ganada' || outcomeData?.state === 'deposito'
+  if (outcomeData && (outcomeData.deal_closed || isSaleState)) {
     try {
-      await supabase.from('sales').upsert({
+      const saleRow = {
         owner_id:       row.user_id,
         client_id:      row.client_id ?? null,
         call_id:        row.id,
@@ -278,9 +281,14 @@ async function finalize(req, res) {
         source:         'transcription',
         status:         'pending',
         notes:          outcomeData.evidence || outcomeData.next_step || null,
-      }, { onConflict: 'call_id' })
+      }
+      // Sin onConflict (el índice de call_id es parcial): comprobar y luego
+      // insertar o actualizar.
+      const { data: existing } = await supabase.from('sales').select('id').eq('call_id', row.id).maybeSingle()
+      if (existing) await supabase.from('sales').update(saleRow).eq('id', existing.id)
+      else await supabase.from('sales').insert(saleRow)
       saleCreated = true
-    } catch (e) { console.error('[finalize] sale upsert failed', e.message) }
+    } catch (e) { console.error('[finalize] sale insert failed', e.message) }
   }
 
   // Notificaciones + secuencias de seguimiento según el flujo de la captura:
