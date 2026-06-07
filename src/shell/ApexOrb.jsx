@@ -280,7 +280,7 @@ const ORB_CSS = `
 .apex-spin { animation: apex-spin 1s linear infinite; }
 @keyframes apex-spin { to { transform: rotate(360deg); } }
 @media (max-width: 480px) {
-  .apex-orb-btn { right: 14px; bottom: 14px; width: 48px; height: 48px; }
-  .apex-orb-panel { right: 14px; bottom: 76px; width: calc(100vw - 28px); }
+  .apex-orb-btn { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 48px; height: 48px; }
+  .apex-orb-panel { right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 28px); max-height: min(620px, calc(100vh - 150px)); }
 }
 `

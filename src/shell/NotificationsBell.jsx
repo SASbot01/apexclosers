@@ -65,7 +65,7 @@ export default function NotificationsBell() {
 const BELL_CSS = `
 .apex-bell { position: relative; display: inline-flex; }
 .apex-bell-dot { position: absolute; top: -2px; right: -2px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: #E58371; color: #0a0c12; font-size: 9.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
-.apex-bell-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 1600; width: 320px; max-height: 420px; overflow: auto; background: var(--apex-card-bg, #0d0f15); border: 1px solid var(--apex-border); box-shadow: 0 24px 48px rgba(0,0,0,0.5); }
+.apex-bell-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 1600; width: min(320px, calc(100vw - 20px)); max-height: 420px; overflow: auto; background: var(--apex-card-bg, #0d0f15); border: 1px solid var(--apex-border); box-shadow: 0 24px 48px rgba(0,0,0,0.5); }
 .apex-bell-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--apex-alpha-3); font-size: 12.5px; color: var(--apex-plat-hi); }
 .apex-bell-list { display: flex; flex-direction: column; }
 .apex-bell-empty { padding: 20px 14px; color: var(--apex-plat-low); font-size: 12.5px; text-align: center; }

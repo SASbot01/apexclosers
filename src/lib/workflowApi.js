@@ -24,5 +24,5 @@ export const listNotifications = () => req('/api/notifications', 'list', { query
 export const markNotifRead = (id) => req('/api/notifications', 'read', { method: 'POST', body: { userId: getUserId(), id } })
 export const markAllNotifRead = () => req('/api/notifications', 'read-all', { method: 'POST', body: { userId: getUserId() } })
 
-// ── Ranking ──
-export const getRanking = () => req('/api/ranking', 'global', { query: { userId: getUserId() } })
+// ── Ranking ── scope: 'global' | 'friends'
+export const getRanking = (scope = 'global') => req('/api/ranking', 'global', { query: { userId: getUserId(), scope } })

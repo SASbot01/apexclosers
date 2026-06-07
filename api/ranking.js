@@ -18,12 +18,25 @@ export default async function handler(req, res) {
 
 async function globalRanking(req, res) {
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const userId = req.query.userId
+  const scope = req.query.scope === 'friends' ? 'friends' : 'global'
+
+  // Ámbito "amigos": solo tú + tus amigos aceptados.
+  let allow = null
+  if (scope === 'friends' && userId) {
+    const { data: fr } = await supabase.from('friendships')
+      .select('requester_id, addressee_id').eq('status', 'accepted')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+    allow = new Set([userId, ...(fr || []).map(f => f.requester_id === userId ? f.addressee_id : f.requester_id)])
+  }
+
   const { data: sales } = await supabase.from('sales')
     .select('owner_id, revenue, cash_collected').eq('status', 'verified').limit(20000)
 
   // Agregamos por closer en memoria (escala de dogfooding).
   const agg = new Map()
   for (const s of (sales || [])) {
+    if (allow && !allow.has(s.owner_id)) continue
     const a = agg.get(s.owner_id) || { owner_id: s.owner_id, revenue: 0, cash: 0, deals: 0 }
     a.revenue += Number(s.revenue) || 0
     a.cash += Number(s.cash_collected) || 0

@@ -14,15 +14,24 @@ const medal = (r) => r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `$
 export default function Ranking() {
   const [data, setData] = useState({ ranking: [], me: null })
   const [state, setState] = useState('loading')
+  const [scope, setScope] = useState('global')
   const navigate = useNavigate()
 
-  useEffect(() => { getRanking().then(d => { setData(d); setState('live') }).catch(() => setState('error')) }, [])
+  useEffect(() => {
+    setState('loading')
+    getRanking(scope).then(d => { setData(d); setState('live') }).catch(() => setState('error'))
+  }, [scope])
 
   return (
     <>
-      <FloatingHeader title="Ranking Global" eyebrow="CLOSERS" />
+      <FloatingHeader title="Ranking" eyebrow="CLOSERS" actions={
+        <div className="seg">
+          <button className="seg-btn" data-active={scope === 'global' || undefined} onClick={() => setScope('global')}>Global</button>
+          <button className="seg-btn" data-active={scope === 'friends' || undefined} onClick={() => setScope('friends')}>Amigos</button>
+        </div>
+      } />
       <section className="apex-section">
-        <p className="set-note" style={{ margin: 0 }}>Clasificación por revenue de ventas verificadas. Sube ventas y verifícalas para escalar.</p>
+        <p className="set-note" style={{ margin: 0 }}>{scope === 'friends' ? 'Tú y tus amigos, por revenue verificado.' : 'Todos los closers, por revenue de ventas verificadas.'} Sube ventas y verifícalas para escalar.</p>
         {state === 'error' && <div className="apex-card" style={{ padding: 16, color: 'var(--apex-plat-mid)' }}>No pude cargar el ranking (¿backend?).</div>}
         {state === 'live' && data.me && (
           <div className="apex-card" style={{ padding: 14, borderColor: 'color-mix(in srgb, #8AC8E0 45%, var(--apex-border))' }}>
@@ -59,6 +68,10 @@ export default function Ranking() {
         .rk-nick { font-size: 11px; color: var(--apex-plat-low); }
         .rk-deals { font-size: 12px; color: var(--apex-plat-low); }
         .rk-rev { font-size: 14px; color: var(--apex-plat-hi); font-family: var(--apex-font); }
+        @media (max-width: 430px) {
+          .rk-row { grid-template-columns: 30px 34px 1fr auto; gap: 8px; padding: 11px 12px; }
+          .rk-deals { display: none; }
+        }
       `}</style>
     </>
   )

@@ -317,3 +317,35 @@ button.lead-tag { cursor: pointer; font-family: var(--apex-font); }
 .mx-form input[type="date"] { flex: 0 0 150px; }
 /* Campos de venta en el resultado del guion */
 .live-sale { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 6px 0 4px; }
+
+/* Paso de una secuencia (Workflow) — responsive */
+.seq-step { display: grid; grid-template-columns: 90px 120px 130px 1fr auto; gap: 8px; align-items: center; padding: 12px; margin-bottom: 8px; position: relative; }
+
+/* ── iPhone 15 Pro y móviles (≤430px cubre 15 / 15 Pro / Plus) ───────── */
+@media (max-width: 430px) {
+  html, body { overflow-x: hidden; }
+  /* Safe areas: laterales (esquinas redondeadas) + home indicator abajo.
+     La Dynamic Island arriba ya la gestiona el topbar. */
+  .apex-main {
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+    gap: 16px;
+  }
+  /* KPIs en 2 columnas, más compactos */
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .kpi { padding: 12px 14px; }
+  .kpi-value { font-size: 18px; }
+  /* Inputs a 16px: evita el zoom automático de iOS al enfocar un campo */
+  .ac-input, select.ac-input, textarea.ac-input, .apex-orb-input { font-size: 16px; }
+  /* Tablas: scroll horizontal con momentum (las columnas no se aplastan) */
+  .tbl-wrap { -webkit-overflow-scrolling: touch; }
+  /* Rejillas a una columna */
+  .live-sale { grid-template-columns: 1fr; }
+  /* Drawer del lead casi a pantalla completa */
+  .dw { width: 100vw; max-width: 100vw; }
+  /* Pasos de secuencia apilados (no se salen de pantalla) */
+  .seq-step { grid-template-columns: 1fr 1fr; padding-right: 34px; }
+  .seq-step > :nth-child(4) { grid-column: 1 / -1; }
+  .seq-step > :last-child { position: absolute; top: 8px; right: 8px; }
+}
