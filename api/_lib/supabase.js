@@ -5,15 +5,31 @@ import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.SUPABASE_URL
 const serviceKey = process.env.SUPABASE_SERVICE_KEY
+const configured = Boolean(url && serviceKey && /^https?:\/\//i.test(url))
 
-if (!url || !serviceKey) {
-  console.warn('[supabase] Falta SUPABASE_URL o SUPABASE_SERVICE_KEY')
+if (!configured) {
+  console.warn('[supabase] SUPABASE_URL/SERVICE_KEY ausente o inválida — el cliente no se construye hasta que se configure')
 }
 
-export const supabase = createClient(url || '', serviceKey || '', {
-  auth: { persistSession: false },
+// Construcción diferida: NO crear el cliente al importar el módulo (createClient
+// lanza si la URL es inválida o falta). Así importar las rutas api/* nunca
+// crashea sin credenciales; el error sale solo si se usa supabase sin configurar.
+let _client = null
+function client() {
+  if (!configured) throw new Error('supabase_not_configured')
+  if (!_client) _client = createClient(url, serviceKey, { auth: { persistSession: false } })
+  return _client
+}
+
+// Proxy con la misma forma que el cliente real: difiere client() al primer uso.
+export const supabase = new Proxy({}, {
+  get(_t, prop) {
+    const c = client()
+    const v = c[prop]
+    return typeof v === 'function' ? v.bind(c) : v
+  },
 })
 
 export function supabaseReady() {
-  return Boolean(url && serviceKey)
+  return configured
 }

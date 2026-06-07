@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
 import HoverMenu from '../../components/HoverMenu'
 import { STAGES, SOURCES, TAGS, ASSIGNEES, MOCK_LEADS, SMART_VIEWS, leadMatches, SUMMARY_FIELDS, genLeadSummary } from '../../data/mock/leads'
 import { CLIENTS, CLIENT_OPTIONS, clientName, CLIENT_CYCLE } from '../../data/mock/clients'
 import { fmtDateTime } from '../../lib/format'
+import { listLeads, saveLead, deleteLead as apiDeleteLead } from '../../lib/leadsApi'
 
 /*
  * Leads (CRM) — recreación fiel del CRM de Apex en stack limpio: Kanban + Lista,
@@ -12,6 +13,7 @@ import { fmtDateTime } from '../../lib/format'
  * WhatsApp), iniciar guion desde el lead, link Zoom/Meet y ver calendario Google.
  */
 const money = (v) => v == null || v === '' ? '—' : new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
+const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
 const fmtDay = (iso) => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) } catch { return '' } }
 const stageLabel = (k) => STAGES.find(s => s.key === k)?.label || k
 const ghost = { background: 'transparent', color: 'var(--apex-plat-mid)', borderColor: 'var(--apex-border)' }
@@ -30,9 +32,13 @@ function FilterMenu({ label, value, display, options, onPick }) {
   )
 }
 
+const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''))
+const mapRow = (r) => ({ ...r, summary: r.summary || null, messages: r.messages || [] })
+
 export default function Leads() {
   const navigate = useNavigate()
   const [leads, setLeads] = useState(MOCK_LEADS)
+  const [source, setSource] = useState('loading') // loading | live | mock
   const [view, setView] = useState('kanban')
   const [filters, setFilters] = useState({})
   const [activeView, setActiveView] = useState('all')
@@ -40,6 +46,30 @@ export default function Leads() {
   const [openId, setOpenId] = useState(null)
   const [tab, setTab] = useState('datos')
   const [draft, setDraft] = useState('')
+  const saveTimers = useRef({})
+
+  // Carga desde el backend (CRM persistido). Si no hay backend, cae a mock.
+  useEffect(() => {
+    let alive = true
+    listLeads()
+      .then(rows => { if (alive) { setLeads(rows.length ? rows.map(mapRow) : []); setSource('live') } })
+      .catch(() => { if (alive) { setLeads(MOCK_LEADS); setSource('mock') } })
+    return () => { alive = false }
+  }, [])
+
+  // Persiste un lead en el backend (debounce por id para no saturar al teclear).
+  const persist = (lead) => {
+    if (source !== 'live') return
+    clearTimeout(saveTimers.current[lead.id])
+    saveTimers.current[lead.id] = setTimeout(() => {
+      saveLead(lead).then(saved => {
+        if (saved && saved.id !== lead.id) {
+          setLeads(ls => ls.map(l => l.id === lead.id ? { ...l, id: saved.id } : l))
+          if (openId === lead.id) setOpenId(saved.id)
+        }
+      }).catch(() => { /* offline: el estado local ya está actualizado */ })
+    }, 500)
+  }
 
   const allViews = [...SMART_VIEWS, ...savedViews]
   const setF = (k, v) => { setFilters(f => { const n = { ...f }; if (v == null) delete n[k]; else n[k] = v; return n }); setActiveView(null) }
@@ -57,17 +87,53 @@ export default function Leads() {
   const active = leads.find(l => l.id === openId)
   const hasFilters = Object.keys(filters).length > 0
 
-  const updateLead = (id, patch) => setLeads(ls => ls.map(l => l.id === id ? { ...l, ...patch } : l))
+  // Métricas del CRM (sobre el conjunto filtrado: respeta cliente/etapa/etc.).
+  const open = filtered.filter(l => l.stage !== 'cerrado')
+  const metrics = {
+    total: filtered.length,
+    pipeline: open.reduce((a, l) => a + (Number(l.value) || 0), 0),
+    won: filtered.filter(l => l.stage === 'cerrado').length,
+    hot: open.filter(l => (l.tags || []).includes('caliente')).length,
+    stale: open.filter(l => l.last_at && (Date.now() - new Date(l.last_at).getTime()) > 7 * 86400000).length,
+    due: open.filter(l => l.next_at && new Date(l.next_at).getTime() <= Date.now()).length,
+  }
+  const crmKpis = [
+    { label: 'Leads', value: intf(metrics.total) },
+    { label: 'Pipeline abierto', value: money(metrics.pipeline) },
+    { label: 'Cerrados', value: intf(metrics.won) },
+    { label: 'Calientes', value: intf(metrics.hot) },
+    { label: 'Sin tocar +7d', value: intf(metrics.stale) },
+    { label: 'Seguimientos vencidos', value: intf(metrics.due) },
+  ]
+
+  const updateLead = (id, patch) => setLeads(ls => ls.map(l => {
+    if (l.id !== id) return l
+    const next = { ...l, ...patch }
+    persist(next)
+    return next
+  }))
   const move = (id, dir) => setLeads(ls => ls.map(l => {
     if (l.id !== id) return l
     const idx = STAGES.findIndex(s => s.key === l.stage)
-    return { ...l, stage: STAGES[Math.min(STAGES.length - 1, Math.max(0, idx + dir))].key }
+    const next = { ...l, stage: STAGES[Math.min(STAGES.length - 1, Math.max(0, idx + dir))].key }
+    persist(next)
+    return next
   }))
   const openLead = (id) => { setOpenId(id); setTab('datos') }
   const addLead = () => {
     const id = 'new' + Date.now()
     const lead = { id, name: 'Nuevo lead', company: '', email: '', phone: '', value: null, stage: 'nuevo', source: SOURCES[0], tags: [], assignee: ASSIGNEES[0], next_step: '', client_id: filters.client || CLIENT_CYCLE[0], last_at: new Date().toISOString(), messages: [] }
     setLeads(ls => [lead, ...ls]); openLead(id)
+    if (source === 'live') {
+      saveLead(lead).then(saved => {
+        if (!saved) return
+        setLeads(ls => ls.map(l => l.id === id ? mapRow(saved) : l)); setOpenId(saved.id)
+      }).catch(() => { /* offline */ })
+    }
+  }
+  const removeLead = (id) => {
+    setLeads(ls => ls.filter(l => l.id !== id)); setOpenId(null)
+    if (source === 'live' && isUuid(id)) apiDeleteLead(id).catch(() => { /* offline */ })
   }
   const sendWa = (lead) => {
     const text = draft.trim(); if (!text) return
@@ -92,6 +158,17 @@ export default function Leads() {
           <button className="ac-btn" onClick={addLead}>+ Lead</button>
         </div>
       } />
+
+      <section className="apex-section">
+        <div className="apex-card kpi-strip">
+          {crmKpis.map(k => (
+            <div className="kpi" key={k.label}>
+              <span className="kpi-label">{k.label}</span>
+              <span className="kpi-value">{k.value}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="apex-section">
         <div className="crm-filters">
@@ -168,10 +245,12 @@ export default function Leads() {
 
             <div className="crm-actions">
               <button className="ac-btn" onClick={() => navigate(`/scripts/live/${active.client_id}`)}>▶ Iniciar guion</button>
+              <button className="ac-btn" style={ghost} onClick={() => navigate('/calendario')} title="Ver calendario de reservas">Calendario</button>
               {active.meeting_url
                 ? <button className="ac-btn" style={ghost} onClick={() => window.open(active.meeting_url, '_blank')}>Reunión</button>
                 : <button className="ac-btn" style={ghost} disabled title="Sin enlace de reunión">Reunión</button>}
               <button className="ac-btn" style={ghost} onClick={() => setTab('chat')}>WhatsApp</button>
+              <button className="ac-btn" style={{ ...ghost, marginLeft: 'auto', color: 'var(--apex-plat-low)' }} onClick={() => { if (window.confirm(`¿Eliminar el lead "${active.name}"?`)) removeLead(active.id) }} title="Eliminar lead">Eliminar</button>
             </div>
 
             <div className="seg" style={{ margin: '4px 0 16px' }}>

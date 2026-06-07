@@ -8,8 +8,11 @@
 // El usuario conecta su correo principal en el login (scope calendar.readonly);
 // Google expone también los calendarios compartidos en calendarList → los leemos.
 
+import crypto from 'crypto'
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { classifyCall } from './_lib/callClassifier.js'
+import { createBot, recallReady } from './_lib/recall.js'
+import { dueForScheduling, computeJoinAt } from './_lib/schedule.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -18,6 +21,7 @@ export default async function handler(req, res) {
     if (action === 'events') return listEvents(req, res)
     if (action === 'sync') return sync(req, res)
     if (action === 'create') return createEvent(req, res)
+    if (action === 'schedule-bots') return scheduleBots(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[calendar]', action, e)
@@ -89,6 +93,8 @@ function shapeEvent({ ev, calendar }, ownerEmail) {
     calendar_event_id: ev.id,
     title: ev.summary || 'Llamada',
     start: ev.start?.dateTime || ev.start?.date,
+    end: ev.end?.dateTime || ev.end?.date || null,
+    all_day: !ev.start?.dateTime,
     calendar,
     classification: cls,
     meeting_url: conf.url, platform: conf.platform,
@@ -131,6 +137,92 @@ async function sync(req, res) {
     if (!error) created++
   }
   return res.status(200).json({ ok: true, scanned: shaped.length, salesEvents: sales.length, upserted: created })
+}
+
+// ── schedule-bots (invitación automática) ───────────────────────────────
+// Programa el Notetaker de Recall para las llamadas de VENTA inminentes de
+// cada closer que conectó su Google. Esto es lo que convierte la conexión de
+// Google en "el bot entra solo": un cron lo llama cada pocos minutos.
+//
+//   ?userId=    → solo ese closer (manual/test)
+//   (sin userId) → TODOS los closers con Google conectado (modo cron)
+//
+// Ventana rodante: solo programa calls que empiezan en los próximos
+// LOOKAHEAD_MS. Con join_at, el bot se reserva y entra ~1 min antes. El cron
+// repite cada 5 min, pero el dedupe por calendar_event_id evita bots dobles,
+// y al comprometernos cerca de la hora toleramos reprogramaciones/cancelaciones.
+const newShareToken = () => crypto.randomBytes(16).toString('hex')
+
+async function scheduleBotsForUser(userId) {
+  const token = await getAccessToken(userId)
+  if (!token) return { userId, scheduled: 0, reason: 'google_not_connected' }
+  const { data: u } = await supabase.from('users').select('email').eq('id', userId).maybeSingle()
+
+  const now = Date.now()
+  const shaped = (await fetchEvents(token)).map(e => shapeEvent(e, u?.email))
+  const due = shaped.filter(e => dueForScheduling(e, now))
+
+  let scheduled = 0
+  const detail = []
+  for (const e of due) {
+    // Dedupe: ¿ya hay un bot para este evento de este closer?
+    const { data: existing } = await supabase
+      .from('calls')
+      .select('id, status')
+      .eq('user_id', userId)
+      .eq('calendar_event_id', e.calendar_event_id)
+      .not('status', 'in', '("cancelled","fatal")')
+      .maybeSingle()
+    if (existing) { detail.push({ event: e.calendar_event_id, skipped: 'already_scheduled' }); continue }
+
+    const joinAt = computeJoinAt(new Date(e.start).getTime(), now)
+
+    try {
+      const bot = await createBot({
+        meetingUrl: e.meeting_url,
+        joinAt,
+        metadata: { user_id: userId, source: 'auto_calendar', calendar_event_id: e.calendar_event_id },
+      })
+      await supabase.from('calls').upsert({
+        user_id:           userId,
+        bot_id:            bot.id,
+        meeting_url:       e.meeting_url,
+        platform:          bot.meeting_url?.platform || e.platform || null,
+        meeting_id:        bot.meeting_url?.meeting_id || null,
+        calendar_event_id: e.calendar_event_id,
+        title:             e.title,
+        classification:    e.classification,
+        status:            joinAt ? 'scheduled' : 'joining',
+        scheduled_at:      e.start,
+        share_token:       newShareToken(),
+      }, { onConflict: 'bot_id' })
+      scheduled++
+      detail.push({ event: e.calendar_event_id, botId: bot.id, joinAt: joinAt || 'now' })
+    } catch (err) {
+      detail.push({ event: e.calendar_event_id, error: err.message })
+    }
+  }
+  return { userId, scanned: shaped.length, due: due.length, scheduled, detail }
+}
+
+async function scheduleBots(req, res) {
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  if (!recallReady())   return res.status(500).json({ error: 'recall_not_configured' })
+
+  const userId = req.query.userId
+  if (userId) {
+    return res.status(200).json({ ok: true, ...(await scheduleBotsForUser(userId)) })
+  }
+
+  // Modo cron: todos los closers con Google conectado.
+  const { data: tokens } = await supabase.from('google_tokens').select('user_id')
+  const results = []
+  for (const t of (tokens || [])) {
+    try { results.push(await scheduleBotsForUser(t.user_id)) }
+    catch (e) { results.push({ userId: t.user_id, error: e.message }) }
+  }
+  const scheduled = results.reduce((n, r) => n + (r.scheduled || 0), 0)
+  return res.status(200).json({ ok: true, closers: results.length, scheduled, results })
 }
 
 // Crea un evento en el calendario del usuario (bidireccional) con Meet, hora España.

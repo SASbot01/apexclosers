@@ -21,7 +21,10 @@ import { supabase, supabaseReady } from './_lib/supabase.js'
 import {
   createBot, getBotRaw, getBotTranscript, getRecordingUrl,
   parseRecallSegments, recallReady, deriveStatus, leaveBot,
+  nameFromEmail, participantSpeaker, getSpeakerTimeline, assignSpeakers,
 } from './_lib/recall.js'
+import { localChat, localLLMReady } from './_lib/localLLM.js'
+import { transcribeUrl, localSttReady } from './_lib/localStt.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -29,6 +32,21 @@ const anthropic = process.env.ANTHROPIC_API_KEY
 
 const SUMMARY_MODEL = 'claude-sonnet-4-6'
 const newShareToken = () => crypto.randomBytes(16).toString('hex')
+
+// Nombre del host (el closer dueño de la call) a partir de su Gmail conectado.
+// Cacheado por user_id para no consultar users en cada chunk del webhook.
+const _hostNameCache = new Map()
+async function hostNameFor(userId) {
+  if (!userId) return null
+  if (_hostNameCache.has(userId)) return _hostNameCache.get(userId)
+  let name = null
+  try {
+    const { data: u } = await supabase.from('users').select('email, name').eq('id', userId).maybeSingle()
+    name = nameFromEmail(u?.email) || (u?.name ? String(u.name).trim().split(/\s+/)[0] : null) || null
+  } catch { /* sin user → host genérico */ }
+  _hostNameCache.set(userId, name)
+  return name
+}
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -83,7 +101,7 @@ async function handleWebhook(req, res) {
   if (!botId) return res.status(200).json({ ok: true, ignored: 'no_bot_id' })
 
   const { data: row } = await supabase
-    .from('calls').select('id, raw_webhook_events, transcript')
+    .from('calls').select('id, user_id, raw_webhook_events, transcript')
     .eq('bot_id', botId).maybeSingle()
   if (!row) return res.status(200).json({ ok: true, ignored: 'bot_not_found' })
 
@@ -99,7 +117,8 @@ async function handleWebhook(req, res) {
   }
   if (event === 'transcript.data') {
     const words = data?.data?.words || []
-    const speaker = data?.data?.participant?.name || 'Desconocido'
+    const hostName = await hostNameFor(row.user_id)
+    const speaker = participantSpeaker(data?.data?.participant, hostName)
     if (words.length > 0) {
       const text = words.map(w => w.text).join(' ')
       const startMs = (words[0]?.start_timestamp?.relative ?? 0) * 1000
@@ -136,22 +155,34 @@ async function finalize(req, res) {
   let transcript = Array.isArray(row.transcript) ? row.transcript : []
   let recordingUrl = row.recording_url
   if (recallReady()) {
+    try { recordingUrl = (await getRecordingUrl(botId)) || recordingUrl } catch { /* best-effort */ }
+  }
+
+  // Nombre del host (Gmail conectado) para etiquetar la transcripción.
+  const hostName = await hostNameFor(row.user_id)
+
+  // Transcripción: preferimos STT LOCAL (Whisper) sobre el audio grabado por
+  // Recall. Si el STT local no está activo, caemos a la transcripción de Recall.
+  // En ambos casos atribuimos interlocutor: host (Gmail) vs "Cliente" cruzando
+  // con la speaker timeline de Recall (metadato gratis, sin coste de transcripción).
+  if (localSttReady() && recordingUrl) {
+    try {
+      const segments = await transcribeUrl(recordingUrl)
+      if (segments.length > 0) {
+        const timeline = await getSpeakerTimeline(botId)
+        transcript = assignSpeakers(segments, timeline, hostName)
+      }
+    } catch (e) { console.error('[finalize] local STT failed', e.message) }
+  } else if (recallReady()) {
     try {
       const segments = await getBotTranscript(botId)
-      if (segments.length > 0) transcript = parseRecallSegments(segments)
-      recordingUrl = await getRecordingUrl(botId)
+      if (segments.length > 0) transcript = parseRecallSegments(segments, hostName)
     } catch { /* sigue con lo que haya */ }
   }
   const transcriptText = transcript.map(s => `${s.speaker}: ${s.text}`).join('\n')
 
-  // Resumen + feedback (markdown, separados por ---)
-  let summary = null, feedback = null
-  if (anthropic && transcriptText.trim().length > 50) {
-    try {
-      const r = await anthropic.messages.create({
-        model: SUMMARY_MODEL,
-        max_tokens: 2000,
-        system: `Eres un asistente de ventas senior. Acabas de analizar una call de tu closer. Escribe en español, primera persona, voz cálida y directa.
+  // Prompts compartidos por la ruta local (Ollama) y la ruta Anthropic.
+  const SUMMARY_SYSTEM = `Eres un asistente de ventas senior. Acabas de analizar una call de tu closer. Escribe en español, primera persona, voz cálida y directa.
 
 Genera dos bloques separados por una línea con tres guiones (---):
 
@@ -167,10 +198,30 @@ BLOQUE 2 — FEEDBACK (markdown):
 - 2-3 cosas para mejorar
 - 1 frase concreta para la próxima call
 
-Sin emojis. Sin exclamaciones. Tono de socio con 15 años de oficio.`,
-        messages: [{ role: 'user', content: `Transcripción:\n\n${transcriptText.slice(0, 30000)}` }],
-      })
-      const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+Sin emojis. Sin exclamaciones. Tono de socio con 15 años de oficio.`
+  const OUTCOME_SYSTEM = `Eres un analista de ventas. Lee la transcripción y devuelve SOLO un JSON válido (sin markdown) con esta forma:
+{"outcome":"won"|"lost"|"follow_up"|"no_show"|"unknown","offer_made":boolean,"offer_amount":number|null,"deposit_collected":boolean,"deal_closed":boolean,"deal_amount":number|null,"next_step":"string corto en español","lead_summary":{"objetivos":"","bloqueos":"","compromiso":"","cualificacion":"","financiera":"","prioridad":"","decision":""}}
+Importes en EUR como números. Si no hay info clara, null/false.
+"lead_summary": cada campo es UNA frase corta en español (2-3 frases solo si hace falta) sobre el lead: objetivos (qué quiere), bloqueos (qué le frena), compromiso (su disposición), cualificacion (si encaja), financiera (capacidad/presupuesto), prioridad (cuán urgente), decision (si es el decisor).`
+
+  const useLocalLLM = localLLMReady()
+  const hasText = transcriptText.trim().length > 50
+
+  // Resumen + feedback (markdown, separados por ---)
+  let summary = null, feedback = null
+  if (hasText && (useLocalLLM || anthropic)) {
+    try {
+      const userMsg = `Transcripción:\n\n${transcriptText.slice(0, 30000)}`
+      let text
+      if (useLocalLLM) {
+        text = await localChat({ system: SUMMARY_SYSTEM, user: userMsg, maxTokens: 2000 })
+      } else {
+        const r = await anthropic.messages.create({
+          model: SUMMARY_MODEL, max_tokens: 2000, system: SUMMARY_SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        })
+        text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+      }
       const parts = text.split(/\n-{3,}\n/)
       summary  = parts[0]?.trim() || null
       feedback = parts[1]?.trim() || null
@@ -179,18 +230,19 @@ Sin emojis. Sin exclamaciones. Tono de socio con 15 años de oficio.`,
 
   // Outcome estructurado (JSON)
   let outcomeData = null
-  if (anthropic && transcriptText.trim().length > 50) {
+  if (hasText && (useLocalLLM || anthropic)) {
     try {
-      const r = await anthropic.messages.create({
-        model: SUMMARY_MODEL,
-        max_tokens: 800,
-        system: `Eres un analista de ventas. Lee la transcripción y devuelve SOLO un JSON válido (sin markdown) con esta forma:
-{"outcome":"won"|"lost"|"follow_up"|"no_show"|"unknown","offer_made":boolean,"offer_amount":number|null,"deposit_collected":boolean,"deal_closed":boolean,"deal_amount":number|null,"next_step":"string corto en español","lead_summary":{"objetivos":"","bloqueos":"","compromiso":"","cualificacion":"","financiera":"","prioridad":"","decision":""}}
-Importes en EUR como números. Si no hay info clara, null/false.
-"lead_summary": cada campo es UNA frase corta en español (2-3 frases solo si hace falta) sobre el lead: objetivos (qué quiere), bloqueos (qué le frena), compromiso (su disposición), cualificacion (si encaja), financiera (capacidad/presupuesto), prioridad (cuán urgente), decision (si es el decisor).`,
-        messages: [{ role: 'user', content: transcriptText.slice(0, 30000) }],
-      })
-      const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+      const userMsg = transcriptText.slice(0, 30000)
+      let text
+      if (useLocalLLM) {
+        text = await localChat({ system: OUTCOME_SYSTEM, user: userMsg, maxTokens: 800, json: true })
+      } else {
+        const r = await anthropic.messages.create({
+          model: SUMMARY_MODEL, max_tokens: 800, system: OUTCOME_SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        })
+        text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+      }
       const m = text.match(/\{[\s\S]*\}/)
       if (m) outcomeData = JSON.parse(m[0])
     } catch (e) { console.error('[finalize] extraction failed', e.message) }

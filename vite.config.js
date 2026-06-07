@@ -9,6 +9,12 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
-  server: { port: 5173, strictPort: true, host: true },
+  server: {
+    port: 5180, strictPort: true, host: true,
+    allowedHosts: true,   // permite el Host del túnel cloudflare (*.trycloudflare.com)
+    // Backend local (server/local-api.mjs) ejecuta las rutas api/*. Sin este
+    // proxy, vite serviría el CÓDIGO FUENTE de api/auth.js en vez de ejecutarlo.
+    proxy: { '/api': 'http://127.0.0.1:5181' },
+  },
   build: { target: 'esnext' },
 })

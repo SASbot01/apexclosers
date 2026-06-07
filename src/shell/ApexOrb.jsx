@@ -4,16 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Loader2 } from 'lucide-react'
 import { CLIENTS } from '../data/mock/clients'
 import { addOrbeConversation } from '../lib/conversations'
+import { API_BASE, USER_ID } from '../lib/config'
 
 /*
- * ApexOrb — asistente IA flotante del shell (el "Orbe").
+ * ApexOrb — copiloto IA flotante del shell (el "Orbe").
  *
- * Fase 0: UI completa + historial local. La conexión real a la IA
- * (SOUL · Memory · Context · Intention, por usuario) llega en la Fase 1 —
- * ver docs/ai/. De momento responde en "modo esqueleto".
- *
- * Arquitectura objetivo: src/lib/orbe/{loop,soul,memory,context,intention,tools}.js
- * + api/orbe/* (chat + proactivo). Ver docs/ai/00-COGNITIVE-ARCHITECTURE.md.
+ * Conectado al LLM local vía /api/orbe (acción chat). El Orbe hace tres cosas:
+ *   1) te dice todas tus métricas, 2) te dice qué está fallando en tu embudo,
+ *   3) te guía en las llamadas para cerrar mejor. El backend calcula tus métricas
+ *   reales (calls + leads) y las inyecta en el prompt del modelo local.
  */
 const ORB_HISTORY_KEY = 'apex_closer_orb_history'
 
@@ -71,21 +70,31 @@ export default function ApexOrb() {
 
   useEffect(() => { writeHistory(messages) }, [messages])
 
-  function send() {
+  async function send() {
     const text = input.trim()
     if (!text || busy) return
     const next = [...messages, { role: 'user', body: text, ts: Date.now() }]
     setMessages(next)
     setInput('')
     setBusy(true)
-    // Modo esqueleto (Fase 0): respuesta local. En Fase 1 esto llamará a
-    // /api/orbe (tool-use + memoria + contexto por usuario).
-    setTimeout(() => {
-      const reply = 'Estoy en modo esqueleto (Fase 0). En la Fase 1 me conecto a la IA — con memoria, contexto e intención propios de tu cuenta — y podré resumir tus llamadas, prepararte follow-ups y darte feedback de verdad.'
-      setMessages([...next, { role: 'assistant', body: reply, ts: Date.now() }])
+    try {
+      const res = await fetch(`${API_BASE}/api/orbe?action=chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: USER_ID,
+          messages: next.map(m => ({ role: m.role, body: m.body })),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      const reply = data.reply || (res.ok ? 'No tengo respuesta ahora mismo.' : 'No pude conectar con el LLM local. Comprueba que el backend y Ollama están arrancados.')
+      setMessages([...next, { role: 'assistant', body: reply, ts: Date.now(), error: !res.ok }])
+    } catch {
+      setMessages([...next, { role: 'assistant', body: 'No pude conectar con el Orbe. ¿Está arrancado el backend local (server/local-api.mjs) y Ollama?', ts: Date.now(), error: true }])
+    } finally {
       setBusy(false)
       requestAnimationFrame(() => inputRef.current?.focus())
-    }, 450)
+    }
   }
 
   function reset() { setMessages([]); writeHistory([]) }
@@ -153,7 +162,7 @@ export default function ApexOrb() {
                 <div className="apex-orb-empty">
                   <img src="/apex-mark.svg" alt="" width={26} height={26} />
                   <h4>¿En qué te ayudo?</h4>
-                  <p>Puedo resumir tus llamadas, prepararte follow-ups y darte feedback. (Conexión IA en Fase 1.)</p>
+                  <p>Te digo tus métricas, qué está fallando en tu embudo y cómo cerrar mejor la próxima llamada.</p>
                   <div className="apex-orb-prompts">
                     {suggestedPrompts.map(p => (
                       <button key={p} type="button" className="apex-orb-prompt" onClick={() => setInput(p)}>{p}</button>
