@@ -25,6 +25,10 @@ import {
 } from './_lib/recall.js'
 import { localChat, localLLMReady } from './_lib/localLLM.js'
 import { transcribeUrl, localSttReady } from './_lib/localStt.js'
+import {
+  EXTRACTION_SYSTEM, normalizeExtraction, saleCashFor, factsLine,
+  summarySystem, buildCoachingContext,
+} from './_lib/callAnalysis.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -181,43 +185,47 @@ async function finalize(req, res) {
   }
   const transcriptText = transcript.map(s => `${s.speaker}: ${s.text}`).join('\n')
 
-  // Prompts compartidos por la ruta local (Ollama) y la ruta Anthropic.
-  const SUMMARY_SYSTEM = `Eres un asistente de ventas senior. Acabas de analizar una call de tu closer. Escribe en español, primera persona, voz cálida y directa.
-
-Genera dos bloques separados por una línea con tres guiones (---):
-
-BLOQUE 1 — RESUMEN (markdown):
-- Encabezado "## Resumen"
-- 3-4 frases con lo esencial
-- Sección "## Puntos clave" con bullets
-- Sección "## Próximo paso" con la acción concreta
-
-BLOQUE 2 — FEEDBACK (markdown):
-- Encabezado "## Lo que vi"
-- 2-3 puntos fuertes del closer
-- 2-3 cosas para mejorar
-- 1 frase concreta para la próxima call
-
-Sin emojis. Sin exclamaciones. Tono de socio con 15 años de oficio.`
-  const OUTCOME_SYSTEM = `Eres un analista de ventas. Lee la transcripción y devuelve SOLO un JSON válido (sin markdown) con esta forma:
-{"outcome":"won"|"lost"|"follow_up"|"no_show"|"unknown","offer_made":boolean,"offer_amount":number|null,"deposit_collected":boolean,"deal_closed":boolean,"deal_amount":number|null,"next_step":"string corto en español","lead_summary":{"objetivos":"","bloqueos":"","compromiso":"","cualificacion":"","financiera":"","prioridad":"","decision":""}}
-Importes en EUR como números. Si no hay info clara, null/false.
-"lead_summary": cada campo es UNA frase corta en español (2-3 frases solo si hace falta) sobre el lead: objetivos (qué quiere), bloqueos (qué le frena), compromiso (su disposición), cualificacion (si encaja), financiera (capacidad/presupuesto), prioridad (cuán urgente), decision (si es el decisor).`
-
   const useLocalLLM = localLLMReady()
   const hasText = transcriptText.trim().length > 50
 
-  // Resumen + feedback (markdown, separados por ---)
+  // Contexto de aprendizaje: patrón de las llamadas anteriores del closer (para
+  // que el feedback mejore con el historial). Independiente de esta call.
+  const coaching = await buildCoachingContext(row.user_id)
+
+  // 1) EXTRACCIÓN comercial rica (JSON) — la base de la tabla de ventas.
+  let outcomeData = null
+  if (hasText && (useLocalLLM || anthropic)) {
+    try {
+      const userMsg = transcriptText.slice(0, 30000)
+      let text
+      if (useLocalLLM) {
+        text = await localChat({ system: EXTRACTION_SYSTEM, user: userMsg, maxTokens: 1100, json: true })
+      } else {
+        const r = await anthropic.messages.create({
+          model: SUMMARY_MODEL, max_tokens: 1100, system: EXTRACTION_SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        })
+        text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+      }
+      const m = text.match(/\{[\s\S]*\}/)
+      if (m) outcomeData = normalizeExtraction(JSON.parse(m[0]))
+    } catch (e) { console.error('[finalize] extraction failed', e.message) }
+  }
+
+  // 2) RESUMEN + FEEDBACK (markdown, separados por ---). Anclado en los HECHOS
+  // ya extraídos (que no se los invente) y en el CONTEXTO del closer (aprende).
   let summary = null, feedback = null
   if (hasText && (useLocalLLM || anthropic)) {
     try {
-      const userMsg = `Transcripción:\n\n${transcriptText.slice(0, 30000)}`
+      const facts = factsLine(outcomeData)
+      const userMsg = `Transcripción:\n\n${transcriptText.slice(0, 30000)}${facts ? `\n\nHechos ya detectados (úsalos, no inventes cifras):\n${facts}` : ''}`
+      const system = summarySystem(coaching)
       let text
       if (useLocalLLM) {
-        text = await localChat({ system: SUMMARY_SYSTEM, user: userMsg, maxTokens: 2000 })
+        text = await localChat({ system, user: userMsg, maxTokens: 2000 })
       } else {
         const r = await anthropic.messages.create({
-          model: SUMMARY_MODEL, max_tokens: 2000, system: SUMMARY_SYSTEM,
+          model: SUMMARY_MODEL, max_tokens: 2000, system,
           messages: [{ role: 'user', content: userMsg }],
         })
         text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
@@ -226,26 +234,6 @@ Importes en EUR como números. Si no hay info clara, null/false.
       summary  = parts[0]?.trim() || null
       feedback = parts[1]?.trim() || null
     } catch (e) { console.error('[finalize] summary failed', e.message) }
-  }
-
-  // Outcome estructurado (JSON)
-  let outcomeData = null
-  if (hasText && (useLocalLLM || anthropic)) {
-    try {
-      const userMsg = transcriptText.slice(0, 30000)
-      let text
-      if (useLocalLLM) {
-        text = await localChat({ system: OUTCOME_SYSTEM, user: userMsg, maxTokens: 800, json: true })
-      } else {
-        const r = await anthropic.messages.create({
-          model: SUMMARY_MODEL, max_tokens: 800, system: OUTCOME_SYSTEM,
-          messages: [{ role: 'user', content: userMsg }],
-        })
-        text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
-      }
-      const m = text.match(/\{[\s\S]*\}/)
-      if (m) outcomeData = JSON.parse(m[0])
-    } catch (e) { console.error('[finalize] extraction failed', e.message) }
   }
 
   await supabase.from('calls').update({
@@ -261,13 +249,16 @@ Importes en EUR como números. Si no hay info clara, null/false.
     deal_amount:       outcomeData?.deal_amount ?? null,
     next_step:         outcomeData?.next_step || null,
     lead_summary:      outcomeData?.lead_summary || null,
+    objections:        outcomeData?.objections || null,   // para el aprendizaje
+    extraction:        outcomeData || null,                // extracción completa
     status: 'done',
     ended_at: row.ended_at || new Date().toISOString(),
   }).eq('id', row.id)
 
-  // Si en la transcripción se cerró una venta, la registramos en la TABLA DE
-  // VENTAS como "pendiente": aparece sola desde la llamada con su importe, pero
-  // NO cuenta en métricas hasta subir justificante y verificarla (api/sales.js).
+  // Si en la transcripción se CERRÓ una venta, la registramos en la TABLA DE
+  // VENTAS como "pendiente" con TODOS los campos (producto, precio, método y tipo
+  // de pago, cobrado…). NO cuenta en métricas hasta subir justificante y
+  // verificarla (api/sales.js).
   let saleCreated = false
   if (outcomeData?.deal_closed && (Number(outcomeData?.deal_amount) > 0)) {
     try {
@@ -277,13 +268,14 @@ Importes en EUR como números. Si no hay info clara, null/false.
         call_id:        row.id,
         date:           row.ended_at || new Date().toISOString(),
         closer:         hostName || null,
-        product:        row.title || 'Cierre en llamada',
+        product:        outcomeData.product || row.title || 'Cierre en llamada',
         revenue:        Number(outcomeData.deal_amount) || 0,
-        cash_collected: Number(outcomeData.deposit_collected ? (outcomeData.offer_amount || outcomeData.deal_amount) : outcomeData.deal_amount) || 0,
-        payment_type:   outcomeData.deposit_collected ? 'Cuotas' : 'Pago único',
+        cash_collected: Number(saleCashFor(outcomeData)) || 0,
+        payment_method: outcomeData.payment_method || null,
+        payment_type:   outcomeData.payment_type || 'Pago único',
         source:         'transcription',
         status:         'pending',
-        notes:          outcomeData.next_step || null,
+        notes:          outcomeData.evidence || outcomeData.next_step || null,
       }, { onConflict: 'call_id' })
       saleCreated = true
     } catch (e) { console.error('[finalize] sale upsert failed', e.message) }
