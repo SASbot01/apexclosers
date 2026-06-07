@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
 import { useCurrentUser, signOut } from '../../lib/auth'
 
@@ -6,6 +7,7 @@ import { useCurrentUser, signOut } from '../../lib/auth'
  */
 export default function Settings() {
   const user = useCurrentUser() || {}
+  const navigate = useNavigate()
   const used = 18, quota = 30 // horas transcritas este mes (mock)
   const pct = Math.min(100, Math.round((used / quota) * 100))
 
@@ -28,8 +30,16 @@ export default function Settings() {
 
         <div className="apex-card set-card">
           <h3>Perfil</h3>
+          <p className="set-note" style={{ margin: '0 0 12px' }}>Tu perfil público: foto, nickname, descripción, links, métricas públicas, amigos y grupos. También puedes generar tu currículum.</p>
+          <div className="set-row">
+            <span className="set-k">Tu perfil</span>
+            <button className="set-btn" onClick={() => navigate('/perfil')}>Abrir perfil</button>
+          </div>
+          <div className="set-row">
+            <span className="set-k">Amigos y grupos</span>
+            <button className="set-btn" onClick={() => navigate('/perfil')}>Gestionar</button>
+          </div>
           <div className="set-row"><span className="set-k">Idioma</span><span className="set-v">Español (ES)</span></div>
-          <div className="set-row"><span className="set-k">Rol</span><span className="set-v">Closer</span></div>
         </div>
 
         <div className="apex-card set-card">

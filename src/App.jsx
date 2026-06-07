@@ -16,6 +16,7 @@ import Leads from './pages/leads/Leads'
 import Finance from './pages/finance/Finance'
 import Reports from './pages/reports/Reports'
 import Settings from './pages/settings/Settings'
+import Profile from './pages/profile/Profile'
 
 /*
  * Shell de la app (software sin nombre · marca = logo Apex).
@@ -53,6 +54,8 @@ function Shell() {
           <Route path="finanzas" element={<Finance />} />
           <Route path="reports" element={<Reports />} />
           <Route path="ajustes" element={<Settings />} />
+          <Route path="perfil" element={<Profile />} />
+          <Route path="perfil/:userId" element={<Profile />} />
           {/* Rutas viejas → fusionadas */}
           <Route path="transcripciones" element={<Navigate to="/llamadas" replace />} />
           <Route path="seguimientos" element={<Navigate to="/pipeline" replace />} />
