@@ -44,7 +44,7 @@ export async function computeUserMetrics(userId) {
   const since = new Date(Date.now() - 365 * 86400 * 1000).toISOString()
   const [salesRes, callsRes, leadsRes] = await Promise.all([
     supabase.from('sales').select('revenue, cash_collected, status').eq('owner_id', userId).eq('status', 'verified').limit(5000),
-    supabase.from('calls').select('status, outcome, offer_made, deal_closed').eq('user_id', userId).gte('started_at', since).limit(5000),
+    supabase.from('calls').select('status, outcome, offer_made, deal_closed').eq('user_id', userId).or(`started_at.gte.${since},started_at.is.null`).limit(5000),
     supabase.from('leads').select('stage, value').eq('owner_id', userId).limit(5000),
   ])
   const S = salesRes.data || [], C = callsRes.data || [], L = leadsRes.data || []

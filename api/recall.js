@@ -254,6 +254,7 @@ async function finalize(req, res) {
     extraction:        outcomeData || null,                // extracción completa
     state:             outcomeData?.state || null,         // estado fino (flujo)
     status: 'done',
+    started_at: row.started_at || row.scheduled_at || row.created_at || new Date().toISOString(),
     ended_at: row.ended_at || new Date().toISOString(),
   }).eq('id', row.id)
 

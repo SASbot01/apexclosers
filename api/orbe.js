@@ -46,7 +46,7 @@ async function computeMetrics(userId) {
   const [{ data: calls }, { data: leads }] = await Promise.all([
     supabase.from('calls')
       .select('status, outcome, offer_made, offer_amount, deposit_collected, deal_closed, deal_amount, next_step, started_at, scheduled_at, title')
-      .eq('user_id', userId).gte('started_at', since).limit(1000),
+      .eq('user_id', userId).or(`started_at.gte.${since},started_at.is.null`).limit(1000),
     supabase.from('leads')
       .select('stage, value, tags, next_step, next_at, last_at')
       .eq('owner_id', userId).limit(1000),
