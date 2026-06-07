@@ -17,7 +17,7 @@ import { useApexTheme, THEMES } from './ThemeContext'
 // cambian con un control segmentado. Ajustes vive en el engranaje de la topbar.
 const SECTIONS = [
   { key: 'home',     label: 'Hoy',      path: '/' },
-  { key: 'clientes', label: 'Clientes', path: '/clientes' },
+  { key: 'clientes', label: 'Ventas',   path: '/clientes' },
   { key: 'llamadas', label: 'Llamadas', path: '/llamadas' },
   { key: 'pipeline', label: 'Leads (CRM)', path: '/pipeline' },
   { key: 'metricas', label: 'Métricas', path: '/finanzas' },

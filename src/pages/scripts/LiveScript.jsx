@@ -36,6 +36,21 @@ export default function LiveScript() {
     return () => clearInterval(t)
   }, [start])
 
+  // Navegación por teclado del teleprompter: ←/→ (y espacio = siguiente) para
+  // moverte entre fases sin tocar el ratón durante la llamada. Se desactiva si
+  // estás escribiendo en un campo o en la pantalla de registro.
+  useEffect(() => {
+    if (finishing) return
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); setI(v => Math.min(phases.length - 1, v + 1)) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); setI(v => Math.max(0, v - 1)) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [finishing, phases.length])
+
   if (!client) {
     return <div className="live-wrap"><div className="apex-card ac-empty">Cliente no encontrado. <Link to="/scripts">Volver a Scripts</Link></div></div>
   }
@@ -100,6 +115,9 @@ export default function LiveScript() {
               {i < phases.length - 1
                 ? <button className="ac-btn" onClick={() => setI(i + 1)}>Siguiente →</button>
                 : <button className="ac-btn" onClick={() => setFinishing(true)}>Terminar y registrar</button>}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--apex-plat-low)', letterSpacing: '0.02em' }}>
+              Atajos: ← → cambian de fase · espacio = siguiente
             </div>
           </div>
 

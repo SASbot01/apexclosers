@@ -9,6 +9,7 @@ const CALLS_TABS = [{ to: '/llamadas', label: 'Llamadas' }, { to: '/scripts', la
 import { useScript, listCallResults } from '../../lib/scripts'
 import { resultLabel } from '../../data/mock/scriptTemplate'
 import { fmtDateTime } from '../../lib/format'
+import { API_BASE } from '../../lib/config'
 
 /*
  * Scripts — guion de llamada por cliente (método Apex). Ver/editar las fases +
@@ -23,6 +24,8 @@ export default function Scripts() {
   const { script, save } = useScript(clientId)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(null)
+  const [optimizing, setOptimizing] = useState(false)
+  const [optMsg, setOptMsg] = useState(null)
   const navigate = useNavigate()
   const results = listCallResults(clientId)
   const data = editing ? draft : script
@@ -30,7 +33,32 @@ export default function Scripts() {
   const startEdit = () => { setDraft(clone(script)); setEditing(true) }
   const commit = () => { save(draft); setEditing(false); setDraft(null) }
   const cancel = () => { setEditing(false); setDraft(null) }
-  const pickClient = (id) => { setClientId(id); cancel() }
+  const pickClient = (id) => { setClientId(id); cancel(); setOptMsg(null) }
+
+  // Optimiza el guion con el LLM local usando los resultados reales del cliente.
+  // El resultado entra en modo edición para que el closer lo revise y guarde.
+  async function optimize() {
+    if (optimizing) return
+    setOptimizing(true); setOptMsg(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/orbe?action=optimize-script`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script, results, clientName: clientName(clientId) }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.script?.phases) {
+        setDraft(d.script); setEditing(true)
+        setOptMsg({ ok: true, text: 'Guion optimizado por la IA. Revísalo y dale a Guardar para fijarlo.' })
+      } else {
+        setOptMsg({ ok: false, text: d.error === 'no_llm_configured' ? 'No hay LLM local activo. Arranca Ollama para optimizar.' : 'No pude optimizar el guion ahora mismo. ¿Backend local y Ollama arrancados?' })
+      }
+    } catch {
+      setOptMsg({ ok: false, text: 'No pude conectar con el Orbe (backend local).' })
+    } finally {
+      setOptimizing(false)
+    }
+  }
 
   const patch = (idx, field, value) => setDraft(d => { const n = clone(d); n.phases[idx][field] = value; return n })
   const setLines = (idx, text) => patch(idx, 'lines', text.split('\n'))
@@ -49,6 +77,9 @@ export default function Scripts() {
           {!editing ? (
             <>
               <button className="ac-btn" onClick={() => navigate(`/scripts/live/${clientId}`)}>▶ Iniciar llamada</button>
+              <button className="ac-btn" style={ghost} onClick={optimize} disabled={optimizing} title="Mejora el guion con la IA local usando los resultados reales de este cliente">
+                {optimizing ? 'Optimizando…' : '✦ Optimizar con IA'}
+              </button>
               <button className="ac-btn" style={ghost} onClick={startEdit}>Editar</button>
             </>
           ) : (
@@ -61,6 +92,11 @@ export default function Scripts() {
       } />
 
       <section className="apex-section">
+        {optMsg && (
+          <div className="apex-card" style={{ padding: '12px 16px', marginBottom: 12, fontSize: 12.5, color: optMsg.ok ? 'var(--apex-plat-hi)' : 'var(--apex-plat-mid)', borderColor: optMsg.ok ? 'var(--apex-plat-mid)' : 'var(--apex-border)' }}>
+            {optMsg.ok ? '✦ ' : ''}{optMsg.text}
+          </div>
+        )}
         {data.phases.map((p, idx) => (
           <div className="apex-card sc-phase" key={p.id}>
             {!editing ? (

@@ -26,8 +26,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || 'chat'
   try {
-    if (action === 'chat')    return chat(req, res)
-    if (action === 'metrics') return metricsEndpoint(req, res)
+    if (action === 'chat')            return chat(req, res)
+    if (action === 'metrics')         return metricsEndpoint(req, res)
+    if (action === 'optimize-script') return optimizeScript(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[orbe]', action, e)
@@ -180,4 +181,81 @@ async function metricsEndpoint(req, res) {
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   const metrics = await computeMetrics(userId).catch(() => null)
   return res.status(200).json({ metrics })
+}
+
+// ── optimize-script ──────────────────────────────────────────────────────
+// Afina el guion de un cliente con el LLM local, apoyándose en los resultados
+// reales de sus llamadas (qué outcome y qué objeciones aparecen). Devuelve un
+// guion con la MISMA forma para que el front lo cargue en modo edición.
+async function optimizeScript(req, res) {
+  const { script, results, clientName } = req.body || {}
+  if (!script || !Array.isArray(script.phases)) return res.status(400).json({ error: 'script_required' })
+  if (!localLLMReady() && !anthropic) return res.status(503).json({ error: 'no_llm_configured' })
+
+  // Resumen compacto de los resultados (no mandamos PII innecesaria).
+  const R = Array.isArray(results) ? results.slice(0, 40) : []
+  const counts = R.reduce((a, r) => { a[r.outcome] = (a[r.outcome] || 0) + 1; return a }, {})
+  const notes = R.filter(r => r.notes).slice(0, 12).map(r => `- (${r.outcome}) ${String(r.notes).slice(0, 160)}`).join('\n') || '- (sin notas registradas)'
+  const countsLine = Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(' · ') || 'sin resultados aún'
+
+  const system = `Eres un closer senior de high-ticket que afina guiones de llamada de admisión. Te paso el guion actual de un cliente y los resultados reales de sus últimas llamadas. Devuelve un guion MEJORADO y accionable, en español, voz directa de oficio.
+
+Trabaja con criterio de cierre:
+- Refuerza las fases donde se pierden ventas según los resultados (p.ej. muchas "lost"/"follow_up" → mejora dolor, precio, cierre y manejo de objeciones).
+- Añade/ajusta objeciones que aparezcan en las notas.
+- Frases concretas y cortas, orientadas a resultado, sin relleno ni emojis ni exclamaciones.
+
+Devuelve SOLO un JSON válido (sin markdown) con EXACTAMENTE esta forma:
+{"phases":[{"id":"string","title":"string","lines":["..."],"tips":["..."]}],"objections":[{"trigger":"string","response":"string"}],"tonalities":["..."]}
+Mantén los "id" de las fases que ya existan. Conserva un número de fases similar (no menos de 5). Cada "lines"/"tips" es una lista de frases cortas.`
+
+  const user = `Cliente: ${clientName || 'Cliente'}
+Resultados recientes (recuento): ${countsLine}
+Notas de llamadas:
+${notes}
+
+Guion actual (JSON):
+${JSON.stringify({ phases: script.phases, objections: script.objections || [], tonalities: script.tonalities || [] })}`
+
+  let text
+  try {
+    if (localLLMReady()) {
+      text = await localChat({ system, user, maxTokens: 2500, json: true })
+    } else {
+      const r = await anthropic.messages.create({
+        model: CHAT_MODEL, max_tokens: 2500, system,
+        messages: [{ role: 'user', content: user }],
+      })
+      text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+    }
+  } catch (e) {
+    console.error('[orbe] optimize llm failed', e.message)
+    return res.status(502).json({ error: 'llm_failed', detail: e.message })
+  }
+
+  let improved
+  try {
+    const m = text.match(/\{[\s\S]*\}/)
+    improved = JSON.parse(m ? m[0] : text)
+  } catch {
+    return res.status(502).json({ error: 'bad_json_from_llm' })
+  }
+  if (!improved || !Array.isArray(improved.phases) || improved.phases.length < 1) {
+    return res.status(502).json({ error: 'invalid_script' })
+  }
+
+  // Normaliza al shape exacto del front (defensivo con lo que devuelva el modelo).
+  const norm = {
+    phases: improved.phases.map((p, i) => ({
+      id: p.id || script.phases[i]?.id || `fase${i + 1}`,
+      title: String(p.title || `Fase ${i + 1}`),
+      lines: Array.isArray(p.lines) ? p.lines.map(String).filter(Boolean) : [],
+      tips: Array.isArray(p.tips) ? p.tips.map(String).filter(Boolean) : [],
+    })),
+    objections: Array.isArray(improved.objections)
+      ? improved.objections.filter(o => o && o.trigger).map(o => ({ trigger: String(o.trigger), response: String(o.response || '') }))
+      : (script.objections || []),
+    tonalities: Array.isArray(improved.tonalities) ? improved.tonalities.map(String).filter(Boolean) : (script.tonalities || []),
+  }
+  return res.status(200).json({ script: norm })
 }

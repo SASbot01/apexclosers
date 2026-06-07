@@ -24,6 +24,8 @@ const ROUTES = {
   '/api/whatsapp': (await import('../api/whatsapp.js')).default,
   '/api/orbe':     (await import('../api/orbe.js')).default,
   '/api/leads':    (await import('../api/leads.js')).default,
+  '/api/sales':    (await import('../api/sales.js')).default,
+  '/api/metrics':  (await import('../api/metrics.js')).default,
 }
 
 // Adapta el res de Node http al contrato Express/Vercel que usan los handlers.
@@ -42,7 +44,7 @@ function readBody(req) {
     const ct = req.headers['content-type'] || ''
     if (!/json/.test(ct)) return resolve(undefined)
     let raw = ''
-    req.on('data', (c) => { raw += c; if (raw.length > 5e6) req.destroy() })
+    req.on('data', (c) => { raw += c; if (raw.length > 15e6) req.destroy() })
     req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : undefined) } catch { resolve(undefined) } })
     req.on('error', () => resolve(undefined))
   })

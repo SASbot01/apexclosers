@@ -265,7 +265,31 @@ Importes en EUR como números. Si no hay info clara, null/false.
     ended_at: row.ended_at || new Date().toISOString(),
   }).eq('id', row.id)
 
-  return res.status(200).json({ ok: true, botId, hasSummary: !!summary, outcome: outcomeData?.outcome })
+  // Si en la transcripción se cerró una venta, la registramos en la TABLA DE
+  // VENTAS como "pendiente": aparece sola desde la llamada con su importe, pero
+  // NO cuenta en métricas hasta subir justificante y verificarla (api/sales.js).
+  let saleCreated = false
+  if (outcomeData?.deal_closed && (Number(outcomeData?.deal_amount) > 0)) {
+    try {
+      await supabase.from('sales').upsert({
+        owner_id:       row.user_id,
+        client_id:      row.client_id ?? null,
+        call_id:        row.id,
+        date:           row.ended_at || new Date().toISOString(),
+        closer:         hostName || null,
+        product:        row.title || 'Cierre en llamada',
+        revenue:        Number(outcomeData.deal_amount) || 0,
+        cash_collected: Number(outcomeData.deposit_collected ? (outcomeData.offer_amount || outcomeData.deal_amount) : outcomeData.deal_amount) || 0,
+        payment_type:   outcomeData.deposit_collected ? 'Cuotas' : 'Pago único',
+        source:         'transcription',
+        status:         'pending',
+        notes:          outcomeData.next_step || null,
+      }, { onConflict: 'call_id' })
+      saleCreated = true
+    } catch (e) { console.error('[finalize] sale upsert failed', e.message) }
+  }
+
+  return res.status(200).json({ ok: true, botId, hasSummary: !!summary, outcome: outcomeData?.outcome, saleCreated })
 }
 
 // ── list ───────────────────────────────────────────────────────────────
