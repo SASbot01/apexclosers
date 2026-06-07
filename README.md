@@ -9,12 +9,16 @@ llamada de venta — *confirmar → transcribir → resumen + feedback → segui
 
 Réplica del stack y el aspecto de **Apex Operations**, en un proyecto limpio desde cero.
 
-> **Estado actual:** esqueleto + PDR. Sin código todavía.
-> El siguiente paso es el scaffold de la **Fase 0** (Vite + React + tema + shell + logo,
-> y conexión de Recall.ai).
+> **Estado actual:** app funcional (Vite + React + backend `api/*` sobre Supabase).
+> Transcripción y análisis con IA local (Ollama + Whisper) o Anthropic, CRM, ventas con
+> verificación por justificante, métricas, perfil social (amigos, grupos, CV, ranking),
+> secuencias de seguimiento y notificaciones.
+>
+> **Para levantarlo en otra máquina / VPS → [DEPLOY.md](./DEPLOY.md).**
 
 ## Documentación
 
+- **[DEPLOY.md](./DEPLOY.md)** — cómo levantarlo en otra máquina o VPS (paso a paso).
 - **[PDR.md](./PDR.md)** — alcance, stack, sistema de diseño, arquitectura, modelo de
   datos, roadmap y decisiones. Es la biblia del proyecto.
 

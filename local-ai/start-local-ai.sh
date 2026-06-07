@@ -5,7 +5,10 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-WHISPER_VENV="/home/s4sf/apex-work/whisper-venv/bin/python"
+# Python de Whisper: configurable por env (en otra máquina/VPS apunta a tu venv
+# o a 'python3'). Default: venv hermano del proyecto; si no existe, python3.
+WHISPER_VENV="${WHISPER_VENV:-$PROJECT_DIR/../whisper-venv/bin/python}"
+[ -x "$WHISPER_VENV" ] || WHISPER_VENV="$(command -v python3 || echo python3)"
 WHISPER_SERVER="$(dirname "$0")/whisper_server.py"
 
 # Device de Whisper: cpu por defecto. Cuando la GPU funcione, exporta
