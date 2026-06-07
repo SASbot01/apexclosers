@@ -20,7 +20,7 @@ const SECTIONS = [
   { key: 'clientes', label: 'Ventas',   path: '/clientes' },
   { key: 'llamadas', label: 'Llamadas', path: '/llamadas' },
   { key: 'pipeline', label: 'Leads (CRM)', path: '/pipeline' },
-  { key: 'metricas', label: 'Métricas', path: '/finanzas' },
+  { key: 'perfil',   label: 'Perfil',   path: '/perfil' },
 ]
 
 export default function ApexLayout() {
@@ -82,7 +82,8 @@ export default function ApexLayout() {
 function sectionKeyForPath(sections, pathname) {
   // Sub-vistas que viven bajo otra sección.
   if (pathname.startsWith('/scripts') || pathname.startsWith('/calendario')) return 'llamadas'
-  if (pathname.startsWith('/reports') || pathname.startsWith('/finanzas')) return 'metricas'
+  // Métricas (evolución/embudo) viven ahora bajo el Perfil.
+  if (pathname.startsWith('/perfil') || pathname.startsWith('/reports') || pathname.startsWith('/finanzas')) return 'perfil'
   if (pathname.startsWith('/ajustes')) return '' // engranaje, sin tab activa
   const sorted = [...sections].sort((a, b) => b.path.length - a.path.length)
   const match = sorted.find(s => pathname === s.path || pathname.startsWith(s.path + '/'))

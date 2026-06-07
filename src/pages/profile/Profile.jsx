@@ -23,7 +23,7 @@ export default function Profile() {
   const [data, setData] = useState(null)     // { profile, metrics, isOwner, friendship }
   const [state, setState] = useState('loading')
   const [editing, setEditing] = useState(false)
-  const [tab, setTab] = useState('perfil')
+  const [tab, setTab] = useState('amigos')
 
   const load = useCallback(() => {
     setState('loading')
@@ -47,59 +47,94 @@ export default function Profile() {
         </div>
       } />
 
-      {editing && isOwn
-        ? <EditProfile profile={profile} onDone={() => { setEditing(false); load() }} />
-        : <ProfileView profile={profile} metrics={metrics} />}
-
-      {isOwn && !editing && (
+      {editing && isOwn ? (
+        <EditProfile profile={profile} onDone={() => { setEditing(false); load() }} />
+      ) : (
         <>
-          <section className="apex-section">
-            <div className="seg" style={{ width: 'fit-content' }}>
-              {[['perfil', 'Resumen'], ['amigos', 'Amigos'], ['grupos', 'Grupos']].map(([k, l]) => (
-                <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
-              ))}
-            </div>
-          </section>
-          {tab === 'amigos' && <FriendsPanel onOpen={(id) => navigate(`/perfil/${id}`)} />}
-          {tab === 'grupos' && <GroupsPanel />}
+          <ProfileHeader profile={profile} />
+
+          {isOwn && (
+            <>
+              <section className="apex-section">
+                <div className="seg" style={{ width: 'fit-content' }}>
+                  {[['amigos', 'Amigos'], ['grupos', 'Grupos']].map(([k, l]) => (
+                    <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
+                  ))}
+                </div>
+              </section>
+              {tab === 'amigos' && <FriendsPanel onOpen={(id) => navigate(`/perfil/${id}`)} />}
+              {tab === 'grupos' && <GroupsPanel />}
+            </>
+          )}
+
+          {/* Métricas SIEMPRE abajo del todo del perfil. */}
+          <MetricsSection metrics={metrics} isOwn={isOwn} onManage={() => navigate('/ajustes')} onEvolucion={() => navigate('/finanzas')} />
         </>
       )}
+      <style>{PF_CSS}</style>
     </>
   )
 }
 
 const ghost = { background: 'transparent', color: 'var(--apex-plat-mid)', borderColor: 'var(--apex-border)' }
 
-function ProfileView({ profile, metrics }) {
-  const pub = (metrics || []).filter(m => m.value != null)
+function ProfileHeader({ profile }) {
   return (
-    <>
-      <section className="apex-section">
-        <div className="apex-card pf-head">
-          <div className="pf-avatar">{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <span>{initials(profile.display_name || profile.nickname)}</span>}</div>
-          <div className="pf-id">
-            <h2 className="pf-name">{profile.display_name || profile.nickname || 'Sin nombre'}</h2>
-            {profile.nickname && <span className="pf-nick">@{profile.nickname}</span>}
-            {profile.headline && <div className="pf-headline">{profile.headline}</div>}
-            {profile.location && <div className="pf-loc">{profile.location}</div>}
-            {profile.bio && <p className="pf-bio">{profile.bio}</p>}
-            {(profile.links || []).length > 0 && (
-              <div className="pf-links">
-                {profile.links.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" className="pf-link">{l.label || l.url}</a>)}
-              </div>
-            )}
-          </div>
+    <section className="apex-section">
+      <div className="apex-card pf-head">
+        <div className="pf-avatar">{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <span>{initials(profile.display_name || profile.nickname)}</span>}</div>
+        <div className="pf-id">
+          <h2 className="pf-name">{profile.display_name || profile.nickname || 'Sin nombre'}</h2>
+          {profile.nickname && <span className="pf-nick">@{profile.nickname}</span>}
+          {profile.headline && <div className="pf-headline">{profile.headline}</div>}
+          {profile.location && <div className="pf-loc">{profile.location}</div>}
+          {profile.bio && <p className="pf-bio">{profile.bio}</p>}
+          {(profile.links || []).length > 0 && (
+            <div className="pf-links">
+              {profile.links.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" className="pf-link">{l.label || l.url}</a>)}
+            </div>
+          )}
         </div>
-      </section>
+      </div>
+    </section>
+  )
+}
 
-      <section className="apex-section">
-        <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Métricas públicas</h3>
-        {pub.length === 0
-          ? <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>No hay métricas públicas. {profile.nickname ? '' : 'Marca métricas como públicas en Métricas.'}</div>
-          : <div className="pf-metrics">{pub.map(m => <div className="apex-card pf-metric" key={m.key}><span className="pf-metric-v">{fmtVal(m)}</span><span className="pf-metric-l">{m.label}</span></div>)}</div>}
-      </section>
-      <style>{PF_CSS}</style>
-    </>
+// Sección de métricas, abajo del todo del perfil. El dueño las ve TODAS (con su
+// etiqueta pública/privada); un visitante (amigo/grupo/invitado) ve solo las
+// públicas. Quién es público/privado se gestiona en Ajustes.
+function MetricsSection({ metrics, isOwn, onManage, onEvolucion }) {
+  const items = (metrics || []).filter(m => m.value != null)
+  return (
+    <section className="apex-section">
+      <div className="home-head" style={{ alignItems: 'baseline' }}>
+        <h3 style={{ margin: 0, fontWeight: 400 }}>Métricas</h3>
+        {isOwn && (
+          <span style={{ display: 'inline-flex', gap: 14 }}>
+            <button className="crm-link" onClick={onEvolucion}>Evolución →</button>
+            <button className="crm-link" onClick={onManage}>Gestionar pública/privada →</button>
+          </span>
+        )}
+      </div>
+      <p className="set-note" style={{ margin: '0 0 6px' }}>
+        {isOwn
+          ? 'Las ves todas. Las marcadas como Pública las pueden ver tus amigos, grupos y la gente que invites; las Privadas, no.'
+          : 'Métricas públicas de este perfil.'}
+      </p>
+      {items.length === 0
+        ? <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>{isOwn ? 'Aún no tienes métricas. Cierra y verifica ventas para que aparezcan.' : 'Este perfil no tiene métricas públicas.'}</div>
+        : (
+          <div className="pf-metrics">
+            {items.map(m => (
+              <div className="apex-card pf-metric" key={m.key} data-public={m.public || undefined}>
+                <span className="pf-metric-v">{fmtVal(m)}</span>
+                <span className="pf-metric-l">{m.label}</span>
+                {isOwn && <span className="pf-metric-vis" data-on={m.public || undefined}>{m.public ? 'Pública' : 'Privada'}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+    </section>
   )
 }
 
@@ -325,8 +360,11 @@ const PF_CSS = `
 .pf-link:hover { border-color: var(--apex-plat-mid); }
 .pf-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .pf-metric { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.pf-metric[data-public] { border-color: color-mix(in srgb, #6FCF9C 40%, var(--apex-border)); }
 .pf-metric-v { font-size: 22px; color: var(--apex-plat-hi); }
 .pf-metric-l { font-size: 11.5px; color: var(--apex-plat-low); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-metric-vis { margin-top: 6px; align-self: flex-start; font-size: 10px; padding: 2px 7px; border: 1px solid var(--apex-border); color: var(--apex-plat-low); border-radius: 2px; }
+.pf-metric-vis[data-on] { color: #6FCF9C; border-color: color-mix(in srgb, #6FCF9C 45%, transparent); }
 .pf-friend-list { display: flex; flex-direction: column; gap: 8px; }
 .pf-friend { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--apex-border); background: var(--apex-card-bg, rgba(255,255,255,0.02)); }
 .pf-friend-av { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; overflow: hidden; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); display: inline-flex; align-items: center; justify-content: center; color: var(--apex-plat-mid); font-size: 13px; }

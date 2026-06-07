@@ -3,16 +3,16 @@ import { Link } from 'react-router-dom'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import FloatingHeader from '../../components/FloatingHeader'
 import SegTabs from '../../components/SegTabs'
-import { getMetrics, getVisibility, setVisibility as apiSetVisibility, listSales } from '../../lib/salesApi'
+import { getMetrics, listSales } from '../../lib/salesApi'
 import { inWindow } from '../../lib/filters'
 
 const METRICS_TABS = [{ to: '/finanzas', label: 'Ventas' }, { to: '/reports', label: 'Embudo' }]
 
 /*
- * Métricas — KPIs desde el backend (api/metrics), contando SOLO ventas
- * verificadas. Cada métrica tiene un check Pública/Privada: lo público se ve en
- * tu Perfil (lo que pueden ver tus amigos). La tabla de ventas vive ahora en
- * "Ventas" (antes Clientes). El gráfico se alimenta de tus ventas verificadas.
+ * Métricas (evolución) — KPIs desde el backend (api/metrics), contando SOLO
+ * ventas verificadas, + gráfico de tus ventas verificadas. Qué métricas son
+ * públicas/privadas se gestiona en Ajustes; se muestran en tu Perfil. La tabla
+ * de ventas vive en "Ventas" (antes Clientes).
  */
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
@@ -25,22 +25,14 @@ export default function Finance() {
   const [time, setTime] = useState('this_quarter')
   const [metric, setMetric] = useState('revenue')
   const [list, setList] = useState([])
-  const [visible, setVisible] = useState({})
   const [sales, setSales] = useState([])
   const [state, setState] = useState('loading')
 
   useEffect(() => {
-    Promise.all([getMetrics(), getVisibility(), listSales('verified')])
-      .then(([m, v, s]) => { setList(m.list || []); setVisible(v || {}); setSales(s || []); setState('live') })
+    Promise.all([getMetrics(), listSales('verified')])
+      .then(([m, s]) => { setList(m.list || []); setSales(s || []); setState('live') })
       .catch(() => setState('error'))
   }, [])
-
-  const togglePublic = (key) => {
-    const next = { ...visible, [key]: !visible[key] }
-    setVisible(next)
-    setList(l => l.map(x => x.key === key ? { ...x, public: next[key] } : x))
-    apiSetVisibility(next).catch(() => { /* offline */ })
-  }
 
   const rows = useMemo(() => sales.filter(s => inWindow(s.date, time)), [sales, time])
   const series = useMemo(() => {
@@ -69,7 +61,7 @@ export default function Finance() {
 
       <section className="apex-section">
         <p className="set-note" style={{ margin: 0 }}>
-          Marca cada métrica como <b>Pública</b> (se ve en tu perfil, para tus amigos) o <b>Privada</b>. Solo cuentan ventas verificadas — la tabla está en <Link to="/clientes" className="crm-link">Ventas</Link>.
+          Solo cuentan ventas verificadas — la tabla está en <Link to="/clientes" className="crm-link">Ventas</Link>. Qué métricas son públicas se elige en <Link to="/ajustes" className="crm-link">Ajustes</Link> y se ven en tu <Link to="/perfil" className="crm-link">Perfil</Link>.
         </p>
         {state === 'error' && <div className="apex-card" style={{ padding: 16, color: 'var(--apex-plat-mid)' }}>No pude cargar las métricas (¿backend?).</div>}
         <div className="mx-cards">
@@ -77,9 +69,6 @@ export default function Finance() {
             <div className="apex-card mx-card" key={m.key} data-public={m.public || undefined}>
               <span className="mx-card-label">{m.label}</span>
               <span className="mx-card-value">{fmtVal(m.fmt, m.value)}</span>
-              <button type="button" className="mx-vis" data-on={m.public || undefined} onClick={() => togglePublic(m.key)} title="Pública = visible en tu perfil">
-                <span className="mx-vis-dot" />{m.public ? 'Pública' : 'Privada'}
-              </button>
             </div>
           ))}
           {state === 'loading' && <div className="apex-card mx-card"><span className="mx-card-label">Cargando…</span></div>}
