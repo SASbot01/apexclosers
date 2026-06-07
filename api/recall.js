@@ -29,6 +29,7 @@ import {
   EXTRACTION_SYSTEM, normalizeExtraction, saleCashFor, factsLine,
   summarySystem, buildCoachingContext,
 } from './_lib/callAnalysis.js'
+import { notify, enqueueFollowUps } from './_lib/workflow.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -251,6 +252,7 @@ async function finalize(req, res) {
     lead_summary:      outcomeData?.lead_summary || null,
     objections:        outcomeData?.objections || null,   // para el aprendizaje
     extraction:        outcomeData || null,                // extracción completa
+    state:             outcomeData?.state || null,         // estado fino (flujo)
     status: 'done',
     ended_at: row.ended_at || new Date().toISOString(),
   }).eq('id', row.id)
@@ -281,7 +283,28 @@ async function finalize(req, res) {
     } catch (e) { console.error('[finalize] sale upsert failed', e.message) }
   }
 
-  return res.status(200).json({ ok: true, botId, hasSummary: !!summary, outcome: outcomeData?.outcome, saleCreated })
+  // Notificaciones + secuencias de seguimiento según el flujo de la captura:
+  //  - Venta → notifica "confirma (sube justificante)".
+  //  - No venta (follow_up/no_show/perdido/deposito) → dispara la secuencia
+  //    activa de ese estado (crea las tareas de seguimiento que ejecuta el cron).
+  if (outcomeData) {
+    const st = outcomeData.state || 'unknown'
+    try {
+      if (saleCreated || st === 'ganada' || st === 'deposito') {
+        await notify(row.user_id, {
+          kind: 'sale_confirm',
+          title: 'Confirma tu venta',
+          body: `${outcomeData.product || row.title || 'Venta'} · ${outcomeData.deal_amount || ''} ${outcomeData.currency || 'EUR'}. Sube el justificante para que cuente en métricas.`,
+          link: '/clientes',
+        })
+      }
+      if (['follow_up_hot', 'follow_up_nurture', 'no_show', 'deposito', 'perdido'].includes(st)) {
+        await enqueueFollowUps({ ownerId: row.user_id, callId: row.id, leadId: null, state: st, contact: null })
+      }
+    } catch (e) { console.error('[finalize] workflow failed', e.message) }
+  }
+
+  return res.status(200).json({ ok: true, botId, hasSummary: !!summary, outcome: outcomeData?.outcome, state: outcomeData?.state, saleCreated })
 }
 
 // ── list ───────────────────────────────────────────────────────────────

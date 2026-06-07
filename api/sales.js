@@ -15,6 +15,7 @@
 //   POST verify       ?id= Body { userId }           → marca verificada (exige justificante)
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
+import { notify } from './_lib/workflow.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PROOF_BUCKET = 'proofs'
@@ -131,5 +132,6 @@ async function verifySale(req, res) {
   if (!row.proof_url) return res.status(400).json({ error: 'proof_required_before_verify' })
   const { data, error } = await supabase.from('sales').update({ status: 'verified' }).eq('id', id).eq('owner_id', userId).select('*').single()
   if (error) return res.status(500).json({ error: error.message })
+  await notify(userId, { kind: 'sale_verified', title: 'Venta verificada', body: `${data.product || 'Venta'} · ${data.revenue || 0} € añadida a tus métricas.`, link: '/finanzas' })
   return res.status(200).json({ sale: data })
 }

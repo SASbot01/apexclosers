@@ -18,9 +18,19 @@ export const EXTRACTION_SYSTEM = `Eres un analista de ventas senior. Lees la tra
 - PLATAFORMA/MÉTODO de pago si se menciona (Stripe, transferencia, tarjeta, PayPal, Bizum, crypto, financiación, efectivo).
 - TIPO de pago: "Pago único" vs "Cuotas" (plan de pagos); si dicen el nº de cuotas, ponlo.
 
+Clasifica además el ESTADO FINO de la llamada en "state":
+- "ganada": venta cerrada con pago completo o compromiso firme de pago total.
+- "deposito": se cobró una señal/depósito o primera cuota, pero NO el total (reserva, plan de pagos).
+- "no_show": el cliente no se presentó.
+- "perdido": dijo que no, no cualifica, o se cae sin intención de seguir.
+- "follow_up_hot": no cerró pero hay interés ALTO y un próximo paso claro a corto plazo.
+- "follow_up_nurture": interés tibio/frío; hay que nutrir a medio plazo.
+- "unknown": no hay datos suficientes.
+
 Devuelve SOLO un JSON válido (sin markdown, sin texto fuera del JSON) con EXACTAMENTE esta forma:
 {
  "outcome":"won"|"lost"|"follow_up"|"no_show"|"unknown",
+ "state":"ganada"|"deposito"|"no_show"|"perdido"|"follow_up_hot"|"follow_up_nurture"|"unknown",
  "sale_discussed":boolean,
  "offer_made":boolean,
  "deal_closed":boolean,
@@ -73,8 +83,20 @@ export function normalizeExtraction(raw) {
     ? [...new Set(raw.objections.map(o => String(o).toLowerCase().trim()).filter(Boolean))].slice(0, 8)
     : []
   const ls = raw.lead_summary && typeof raw.lead_summary === 'object' ? raw.lead_summary : null
+  const outcome = ['won', 'lost', 'follow_up', 'no_show', 'unknown'].includes(raw.outcome) ? raw.outcome : 'unknown'
+  // Estado fino: usa el del modelo si es válido; si no, lo derivamos.
+  const STATES = ['ganada', 'deposito', 'no_show', 'perdido', 'follow_up_hot', 'follow_up_nurture', 'unknown']
+  let state = STATES.includes(raw.state) ? raw.state : null
+  if (!state) {
+    if (outcome === 'no_show') state = 'no_show'
+    else if (deal_closed) state = deposit ? 'deposito' : 'ganada'
+    else if (outcome === 'lost') state = 'perdido'
+    else if (outcome === 'follow_up') state = toBool(raw.offer_made) ? 'follow_up_hot' : 'follow_up_nurture'
+    else state = 'unknown'
+  }
   return {
-    outcome: ['won', 'lost', 'follow_up', 'no_show', 'unknown'].includes(raw.outcome) ? raw.outcome : 'unknown',
+    outcome,
+    state,
     sale_discussed: toBool(raw.sale_discussed) || toBool(raw.offer_made) || deal_closed,
     offer_made: toBool(raw.offer_made),
     deal_closed,

@@ -28,6 +28,9 @@ const ROUTES = {
   '/api/metrics':  (await import('../api/metrics.js')).default,
   '/api/profile':  (await import('../api/profile.js')).default,
   '/api/friends':  (await import('../api/friends.js')).default,
+  '/api/sequences':     (await import('../api/sequences.js')).default,
+  '/api/notifications': (await import('../api/notifications.js')).default,
+  '/api/ranking':       (await import('../api/ranking.js')).default,
 }
 
 // Adapta el res de Node http al contrato Express/Vercel que usan los handlers.
@@ -94,7 +97,13 @@ function startLocalCron() {
       } catch (e) { /* sin credenciales aún: silencioso */ }
     }
     try { await fetch(`${base}/api/recall?action=reconcile-stuck`, { method: 'POST' }) } catch { /* idem */ }
+    // Ejecuta las tareas de seguimiento vencidas (genera notificaciones).
+    try {
+      const { processDueFollowUps } = await import('../api/_lib/workflow.js')
+      const r = await processDueFollowUps()
+      if (r.processed) console.log(`[cron] seguimientos ejecutados: ${r.processed}`)
+    } catch { /* sin credenciales aún */ }
   }
   setInterval(tick, 5 * 60 * 1000)
-  console.log('[local-api] cron local activo (schedule-bots + reconcile-stuck cada 5 min)')
+  console.log('[local-api] cron local activo (schedule-bots + reconcile-stuck + seguimientos cada 5 min)')
 }

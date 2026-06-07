@@ -42,6 +42,7 @@ export default function Profile() {
       <FloatingHeader title="Perfil" eyebrow="PERFIL" actions={
         <div style={{ display: 'inline-flex', gap: 8 }}>
           {!isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/perfil')}>← Mi perfil</button>}
+          {isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/ranking')}>Ranking</button>}
           <button className="ac-btn" style={ghost} onClick={async () => { const cv = await getCV(targetId).catch(() => null); if (cv) openCV(cv); else alert('No pude generar el CV.') }}>Currículum</button>
           {isOwn && !editing && <button className="ac-btn" onClick={() => setEditing(true)}>Editar perfil</button>}
         </div>

@@ -17,6 +17,8 @@ import Finance from './pages/finance/Finance'
 import Reports from './pages/reports/Reports'
 import Settings from './pages/settings/Settings'
 import Profile from './pages/profile/Profile'
+import Sequences from './pages/sequences/Sequences'
+import Ranking from './pages/ranking/Ranking'
 
 /*
  * Shell de la app (software sin nombre · marca = logo Apex).
@@ -56,6 +58,8 @@ function Shell() {
           <Route path="ajustes" element={<Settings />} />
           <Route path="perfil" element={<Profile />} />
           <Route path="perfil/:userId" element={<Profile />} />
+          <Route path="secuencias" element={<Sequences />} />
+          <Route path="ranking" element={<Ranking />} />
           {/* Rutas viejas → fusionadas */}
           <Route path="transcripciones" element={<Navigate to="/llamadas" replace />} />
           <Route path="seguimientos" element={<Navigate to="/pipeline" replace />} />

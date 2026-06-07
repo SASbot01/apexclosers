@@ -3,6 +3,7 @@ import { motion, useScroll, useSpring } from 'framer-motion'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, Menu, Settings } from 'lucide-react'
 import { useApexTheme, THEMES } from './ThemeContext'
+import NotificationsBell from './NotificationsBell'
 
 /*
  * ApexLayout — shell compartido. Portado de Apex Operations, limpio:
@@ -50,6 +51,7 @@ export default function ApexLayout() {
           </div>
           <SectionNav sections={SECTIONS} active={activeKey} pathname={location.pathname} />
           <div className="apex-topbar-end" aria-hidden="true" />
+          <NotificationsBell />
           <button
             type="button"
             className="apex-gear"

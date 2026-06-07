@@ -49,6 +49,13 @@ export default function Settings() {
           <div className="set-row"><span className="set-k">Idioma</span><span className="set-v">Español (ES)</span></div>
         </div>
 
+        <div className="apex-card set-card">
+          <h3>Workflow y seguimiento</h3>
+          <p className="set-note" style={{ margin: '0 0 12px' }}>Secuencias de seguimiento por estado de llamada (Email/WhatsApp/SMS) y ranking global de closers.</p>
+          <div className="set-row"><span className="set-k">Secuencias</span><button className="set-btn" onClick={() => navigate('/secuencias')}>Configurar</button></div>
+          <div className="set-row"><span className="set-k">Ranking global</span><button className="set-btn" onClick={() => navigate('/ranking')}>Ver ranking</button></div>
+        </div>
+
         <MetricsVisibilityCard />
 
         <div className="apex-card set-card">
