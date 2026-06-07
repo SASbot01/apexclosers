@@ -208,7 +208,7 @@ function FriendsPanel({ onOpen }) {
   const [results, setResults] = useState([])
   const [msg, setMsg] = useState(null)
   const load = () => listFriends().then(setD).catch(() => {})
-  useEffect(load, [])
+  useEffect(() => { load() }, [])
 
   const doSearch = async () => { if (!q.trim()) return setResults([]); setResults(await searchProfiles(q).catch(() => [])) }
   const doInvite = async (nickOrEmail) => {
@@ -294,7 +294,7 @@ function GroupsPanel() {
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🔥')
   const load = () => { listGroups().then(setGroups).catch(() => {}); listFriends().then(d => setFriends(d.friends)).catch(() => {}) }
-  useEffect(load, [])
+  useEffect(() => { load() }, [])
 
   const add = async () => { if (!name.trim()) return; await createGroup(name, emoji).catch(() => {}); setName(''); load() }
 
