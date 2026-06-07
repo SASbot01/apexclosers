@@ -54,11 +54,22 @@ export default function Profile() {
         <>
           <ProfileHeader profile={profile} />
 
+          {isOwn && (!profile.nickname || !profile.bio || !profile.photo_url) && (
+            <section className="apex-section">
+              <div className="apex-card" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderColor: 'color-mix(in srgb, #8AC8E0 40%, var(--apex-border))' }}>
+                <span style={{ fontSize: 13, color: 'var(--apex-plat-mid)' }}>
+                  Completa tu perfil: {[!profile.photo_url && 'foto', !profile.nickname && 'nickname', !profile.bio && 'descripción'].filter(Boolean).join(' · ')} y añade tus enlaces.
+                </span>
+                <button className="ac-btn" onClick={() => setEditing(true)}>Completar perfil</button>
+              </div>
+            </section>
+          )}
+
           {isOwn && (
             <>
               <section className="apex-section">
                 <div className="seg" style={{ width: 'fit-content' }}>
-                  {[['amigos', 'Amigos'], ['grupos', 'Grupos']].map(([k, l]) => (
+                  {[['amigos', 'Amigos e invitar'], ['grupos', 'Grupos']].map(([k, l]) => (
                     <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
                   ))}
                 </div>
@@ -225,7 +236,8 @@ function FriendsPanel({ onOpen }) {
     <>
       <section className="apex-section">
         <div className="apex-card" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 12px', fontWeight: 400 }}>Invitar a tu cuenta</h3>
+          <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Buscar perfiles e invitar</h3>
+          <p className="set-note" style={{ margin: '0 0 12px' }}>Encuentra a otros closers por su nickname (o invita por email) y conéctate para ver sus métricas públicas.</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input className="ac-input" style={{ maxWidth: 280 }} placeholder="Buscar por nickname o email…" value={q}
               onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} />
