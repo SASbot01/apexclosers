@@ -104,6 +104,10 @@ function startLocalCron() {
       if (r.processed) console.log(`[cron] seguimientos ejecutados: ${r.processed}`)
     } catch { /* sin credenciales aún */ }
   }
+  // Pasada inmediata al arrancar: si el server se reinició dentro de la ventana
+  // de una call inminente, la programa en segundos (no espera al primer tick de
+  // 5 min). Pequeño retardo para asegurar que el server ya escucha.
+  setTimeout(tick, 2000)
   setInterval(tick, 5 * 60 * 1000)
-  console.log('[local-api] cron local activo (schedule-bots + reconcile-stuck + seguimientos cada 5 min)')
+  console.log('[local-api] cron local activo (pasada inicial + schedule-bots + reconcile-stuck + seguimientos cada 5 min)')
 }
