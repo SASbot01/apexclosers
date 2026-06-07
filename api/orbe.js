@@ -29,6 +29,9 @@ export default async function handler(req, res) {
     if (action === 'chat')            return chat(req, res)
     if (action === 'metrics')         return metricsEndpoint(req, res)
     if (action === 'optimize-script') return optimizeScript(req, res)
+    if (action === 'roleplay')        return roleplay(req, res)
+    if (action === 'roleplay-eval')   return roleplayEval(req, res)
+    if (action === 'live-support')    return liveSupport(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[orbe]', action, e)
@@ -181,6 +184,82 @@ async function metricsEndpoint(req, res) {
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   const metrics = await computeMetrics(userId).catch(() => null)
   return res.status(200).json({ metrics })
+}
+
+// Helper LLM (local u Anthropic) para un turno system+user.
+async function llmTurn({ system, user, maxTokens = 600 }) {
+  if (localLLMReady()) return localChat({ system, user, maxTokens })
+  if (anthropic) {
+    const r = await anthropic.messages.create({ model: CHAT_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] })
+    return (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+  }
+  throw new Error('no_llm_configured')
+}
+
+// ── Roleplay ───────────────────────────────────────────────────────────────
+// La IA interpreta a un CLIENTE/prospect realista para que el closer practique.
+async function roleplay(req, res) {
+  const { messages, clientName, difficulty } = req.body || {}
+  const history = Array.isArray(messages) ? messages.filter(m => m && m.body) : []
+  if (!localLLMReady() && !anthropic) return res.status(503).json({ error: 'no_llm_configured' })
+  const dif = difficulty === 'duro' ? 'difícil (muchas objeciones, escéptico)' : difficulty === 'facil' ? 'fácil (interesado, pocas pegas)' : 'realista (ni regalado ni imposible)'
+  const system = `Estás en un ROLEPLAY de entrenamiento de ventas high-ticket. Interpretas a un CLIENTE POTENCIAL realista${clientName ? ` del sector "${clientName}"` : ''}. Nivel: ${dif}.
+Reglas:
+- Mantente SIEMPRE en personaje. Responde SOLO como el cliente, en español, natural y corto (1-3 frases).
+- Pon objeciones creíbles (precio, tiempo, "lo hablo con mi pareja/socio", miedo a que no funcione, desconfianza). No seas imposible: si el closer rebate bien y genera valor, ve cediendo de forma realista; si lo hace flojo, mantente reticente.
+- No des consejos, no rompas el personaje, no expliques lo que haces. Solo habla como el cliente.
+- Si el closer cierra de forma sólida y resuelve tus dudas, puedes aceptar la oferta.`
+  if (!history.length) {
+    // Apertura: el cliente "coge el teléfono".
+    const opener = await llmTurn({ system, user: 'Inicia tú la llamada como el cliente que acaba de descolgar, breve y neutro.', maxTokens: 120 }).catch(() => null)
+    return res.status(200).json({ reply: (opener || 'Hola, ¿sí? Dime.').trim() })
+  }
+  const convo = history.slice(-16).map(m => `${m.role === 'user' ? 'Closer' : 'Cliente'}: ${m.body}`).join('\n')
+  let reply
+  try { reply = await llmTurn({ system, user: `${convo}\n\nCliente:`, maxTokens: 200 }) }
+  catch (e) { return res.status(502).json({ error: 'llm_failed', detail: e.message }) }
+  return res.status(200).json({ reply: (reply || '').trim() || '…' })
+}
+
+// Evalúa el roleplay y da nota + feedback al closer.
+async function roleplayEval(req, res) {
+  const { messages, clientName } = req.body || {}
+  const history = Array.isArray(messages) ? messages.filter(m => m && m.body) : []
+  if (!history.length) return res.status(400).json({ error: 'messages_required' })
+  if (!localLLMReady() && !anthropic) return res.status(503).json({ error: 'no_llm_configured' })
+  const system = `Eres un coach de ventas senior. Lee este roleplay (Closer vs Cliente simulado${clientName ? ` del sector ${clientName}` : ''}) y evalúa AL CLOSER. Devuelve markdown en español, sin emojis ni exclamaciones:
+## Puntuación
+X/10 — una frase justificándola.
+## Lo que hizo bien
+- 2-3 bullets concretos
+## A mejorar
+- 2-3 bullets concretos (cita el momento)
+## Frase para la próxima
+"una frase accionable"`
+  const convo = history.map(m => `${m.role === 'user' ? 'Closer' : 'Cliente'}: ${m.body}`).join('\n')
+  let text
+  try { text = await llmTurn({ system, user: convo, maxTokens: 700 }) }
+  catch (e) { return res.status(502).json({ error: 'llm_failed', detail: e.message }) }
+  return res.status(200).json({ evaluation: (text || '').trim() })
+}
+
+// ── Live Call Support ───────────────────────────────────────────────────────
+// Copiloto EN VIVO: dada la situación/objeción actual + el guion, sugiere qué decir.
+async function liveSupport(req, res) {
+  const { situation, clientName, objections, tonalities } = req.body || {}
+  if (!situation) return res.status(400).json({ error: 'situation_required' })
+  if (!localLLMReady() && !anthropic) return res.status(503).json({ error: 'no_llm_configured' })
+  const objText = Array.isArray(objections) && objections.length
+    ? objections.map(o => `- ${o.trigger}: ${o.response}`).join('\n') : '—'
+  const tonText = Array.isArray(tonalities) && tonalities.length ? tonalities.join(', ') : '—'
+  const system = `Eres el COPILOTO EN VIVO de un closer durante una llamada de venta${clientName ? ` (cliente: ${clientName})` : ''}. Te paso lo que está pasando AHORA y el guion. Devuelve UNA respuesta lista para decir EN VOZ ALTA, en español, 1-2 frases, directa, con tono de cierre y empatía. Sin preámbulos, sin comillas, solo la frase. Apóyate en las objeciones y tonalidades del guion.
+Objeciones del guion:
+${objText}
+Tonalidades: ${tonText}`
+  let reply
+  try { reply = await llmTurn({ system, user: `Situación ahora mismo: ${String(situation).slice(0, 500)}`, maxTokens: 160 }) }
+  catch (e) { return res.status(502).json({ error: 'llm_failed', detail: e.message }) }
+  return res.status(200).json({ suggestion: (reply || '').trim() })
 }
 
 // ── optimize-script ──────────────────────────────────────────────────────

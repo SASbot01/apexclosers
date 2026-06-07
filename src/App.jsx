@@ -11,6 +11,7 @@ import Clients from './pages/clients/Clients'
 import ClientDetail from './pages/clients/ClientDetail'
 import Scripts from './pages/scripts/Scripts'
 import LiveScript from './pages/scripts/LiveScript'
+import Roleplay from './pages/scripts/Roleplay'
 import Calendar from './pages/calendar/Calendar'
 import Leads from './pages/leads/Leads'
 import Finance from './pages/finance/Finance'
@@ -50,6 +51,7 @@ function Shell() {
           <Route path="clientes/:id" element={<ClientDetail />} />
           <Route path="scripts" element={<Scripts />} />
           <Route path="scripts/live/:clientId" element={<LiveScript />} />
+          <Route path="scripts/roleplay/:clientId" element={<Roleplay />} />
           <Route path="calendario" element={<Calendar />} />
           <Route path="pipeline" element={<Leads />} />
           <Route path="leads" element={<Leads />} />

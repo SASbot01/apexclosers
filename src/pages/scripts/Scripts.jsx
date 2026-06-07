@@ -77,6 +77,7 @@ export default function Scripts() {
           {!editing ? (
             <>
               <button className="ac-btn" onClick={() => navigate(`/scripts/live/${clientId}`)}>▶ Iniciar llamada</button>
+              <button className="ac-btn" style={ghost} onClick={() => navigate(`/scripts/roleplay/${clientId}`)} title="Practica tu pitch contra un cliente simulado por IA">🎭 Roleplay</button>
               <button className="ac-btn" style={ghost} onClick={optimize} disabled={optimizing} title="Mejora el guion con la IA local usando los resultados reales de este cliente">
                 {optimizing ? 'Optimizando…' : '✦ Optimizar con IA'}
               </button>

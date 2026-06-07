@@ -5,6 +5,7 @@ import { addReportEntry, addSale } from '../../lib/metrics'
 import { getClient } from '../../data/mock/clients'
 import { MOCK_LEADS } from '../../data/mock/leads'
 import { RESULTS } from '../../data/mock/scriptTemplate'
+import { API_BASE } from '../../lib/config'
 
 /*
  * Modo llamada en vivo — teleprompter del guion del cliente. Te vas guiando por
@@ -30,6 +31,10 @@ export default function LiveScript() {
   const [cash, setCash] = useState('')
   const [start] = useState(() => Date.now())
   const [elapsed, setElapsed] = useState(0)
+  // Copiloto en vivo (Live Call Support)
+  const [coSit, setCoSit] = useState('')
+  const [coSug, setCoSug] = useState(null)
+  const [coBusy, setCoBusy] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000)
@@ -82,8 +87,25 @@ export default function LiveScript() {
     navigate(`/clientes/${clientId}`)
   }
 
+  // Copiloto en vivo: dada la situación/objeción actual, sugiere qué decir ya.
+  async function askCopilot(situation) {
+    const sit = (situation || coSit).trim()
+    if (!sit || coBusy) return
+    setCoBusy(true); setCoSug(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/orbe?action=live-support`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ situation: sit, clientName: client.name, objections: script.objections, tonalities: script.tonalities }),
+      })
+      const d = await res.json().catch(() => ({}))
+      setCoSug(res.ok ? (d.suggestion || '—') : 'No pude sugerir (¿LLM local arrancado?).')
+    } catch { setCoSug('Sin conexión con el copiloto.') }
+    finally { setCoBusy(false) }
+  }
+
   return (
     <div className="live-wrap">
+      <style>{LIVE_CO_CSS}</style>
       <div className="live-bar">
         <Link to="/scripts" className="home-link">← Salir</Link>
         <span className="live-client">{client.name}</span>
@@ -122,7 +144,22 @@ export default function LiveScript() {
           </div>
 
           <aside className="live-side">
-            <div className="live-side-h">Objeciones</div>
+            <div className="live-side-h">Copiloto en vivo</div>
+            <div className="live-copilot">
+              <div className="live-co-chips">
+                {(script.objections || []).slice(0, 5).map((o, k) => (
+                  <button key={k} type="button" className="live-co-chip" onClick={() => { setCoSit(o.trigger); askCopilot(o.trigger) }} disabled={coBusy}>{o.trigger}</button>
+                ))}
+              </div>
+              <div className="live-co-input">
+                <input className="ac-input" placeholder="¿Qué está pasando ahora?" value={coSit}
+                  onChange={e => setCoSit(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') askCopilot() }} />
+                <button type="button" className="ac-btn" onClick={() => askCopilot()} disabled={coBusy || !coSit.trim()}>{coBusy ? '…' : 'Sugerir'}</button>
+              </div>
+              {coSug && <div className="live-co-sug">{coSug}</div>}
+            </div>
+
+            <div className="live-side-h" style={{ marginTop: 16 }}>Objeciones</div>
             {script.objections?.map((o, k) => (
               <div className="live-obj" key={k}><div className="live-obj-t">{o.trigger}</div><div className="live-obj-r">{o.response}</div></div>
             ))}
@@ -169,3 +206,15 @@ export default function LiveScript() {
     </div>
   )
 }
+
+const LIVE_CO_CSS = `
+.live-copilot { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.live-co-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.live-co-chip { background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); color: var(--apex-plat-mid); font-family: var(--apex-font); font-size: 10.5px; padding: 3px 7px; cursor: pointer; }
+.live-co-chip:hover:not(:disabled) { color: var(--apex-plat-hi); border-color: var(--apex-plat-mid); }
+.live-co-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.live-co-input { display: flex; gap: 6px; }
+.live-co-input .ac-input { flex: 1; min-width: 0; }
+.live-co-sug { padding: 9px 11px; background: color-mix(in srgb, #6FCF9C 12%, var(--apex-trigger-bg)); border: 1px solid color-mix(in srgb, #6FCF9C 40%, var(--apex-border)); color: var(--apex-plat-hi); font-size: 12.5px; line-height: 1.5; }
+`
+
