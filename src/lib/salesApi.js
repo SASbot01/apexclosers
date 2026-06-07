@@ -1,5 +1,5 @@
 // Cliente de la tabla de ventas (/api/sales) y de las métricas (/api/metrics).
-import { API_BASE, USER_ID } from './config'
+import { API_BASE, getUserId } from './config'
 
 async function call(base, action, { method = 'GET', query = {}, body } = {}) {
   const params = new URLSearchParams({ action, ...query })
@@ -14,16 +14,16 @@ async function call(base, action, { method = 'GET', query = {}, body } = {}) {
 }
 
 // ── Ventas ──
-export const listSales   = (status) => call('/api/sales', 'list', { query: { userId: USER_ID, ...(status ? { status } : {}) } }).then(d => d.sales || [])
-export const saveSale    = (sale)   => call('/api/sales', 'upsert', { method: 'POST', body: { userId: USER_ID, sale } }).then(d => d.sale)
-export const deleteSale  = (id)     => call('/api/sales', 'delete', { method: 'POST', query: { id }, body: { userId: USER_ID } })
-export const verifySale  = (id)     => call('/api/sales', 'verify', { method: 'POST', query: { id }, body: { userId: USER_ID } }).then(d => d.sale)
-export const uploadProof = (id, proof, filename) => call('/api/sales', 'upload-proof', { method: 'POST', body: { userId: USER_ID, id, proof, filename } }).then(d => d.sale)
+export const listSales   = (status) => call('/api/sales', 'list', { query: { userId: getUserId(), ...(status ? { status } : {}) } }).then(d => d.sales || [])
+export const saveSale    = (sale)   => call('/api/sales', 'upsert', { method: 'POST', body: { userId: getUserId(), sale } }).then(d => d.sale)
+export const deleteSale  = (id)     => call('/api/sales', 'delete', { method: 'POST', query: { id }, body: { userId: getUserId() } })
+export const verifySale  = (id)     => call('/api/sales', 'verify', { method: 'POST', query: { id }, body: { userId: getUserId() } }).then(d => d.sale)
+export const uploadProof = (id, proof, filename) => call('/api/sales', 'upload-proof', { method: 'POST', body: { userId: getUserId(), id, proof, filename } }).then(d => d.sale)
 
 // ── Métricas ──
-export const getMetrics    = (viewerId) => call('/api/metrics', 'metrics', { query: { userId: USER_ID, ...(viewerId ? { viewerId } : {}) } })
-export const getVisibility  = () => call('/api/metrics', 'visibility', { query: { userId: USER_ID } }).then(d => d.visibility || {})
-export const setVisibility  = (visible) => call('/api/metrics', 'visibility', { method: 'POST', body: { userId: USER_ID, visible } })
+export const getMetrics    = (viewerId) => call('/api/metrics', 'metrics', { query: { userId: getUserId(), ...(viewerId ? { viewerId } : {}) } })
+export const getVisibility  = () => call('/api/metrics', 'visibility', { query: { userId: getUserId() } }).then(d => d.visibility || {})
+export const setVisibility  = (visible) => call('/api/metrics', 'visibility', { method: 'POST', body: { userId: getUserId(), visible } })
 
 // Lee un File como data URL (para subir el justificante).
 export const fileToDataUrl = (file) => new Promise((resolve, reject) => {

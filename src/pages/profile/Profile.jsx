@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
-import { USER_ID } from '../../lib/config'
+import { getUserId } from '../../lib/config'
 import {
   getProfile, getProfileById, updateProfile, uploadPhoto, searchProfiles, getCV, fileToDataUrl,
   listFriends, invite, respondInvite, removeFriend, listGroups, createGroup, deleteGroup, groupAdd, groupRemove,
@@ -17,8 +17,8 @@ const initials = (name) => (name || '?').split(' ').slice(0, 2).map(s => s[0]).j
 export default function Profile() {
   const { userId: routeUserId } = useParams()
   const navigate = useNavigate()
-  const targetId = routeUserId || USER_ID
-  const isOwn = targetId === USER_ID
+  const targetId = routeUserId || getUserId()
+  const isOwn = targetId === getUserId()
 
   const [data, setData] = useState(null)     // { profile, metrics, isOwner, friendship }
   const [state, setState] = useState('loading')

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import FloatingHeader from '../../components/FloatingHeader'
 import SegTabs from '../../components/SegTabs'
 import { useCurrentUser } from '../../lib/auth'
-import { API_BASE, USER_ID } from '../../lib/config'
+import { API_BASE, getUserId } from '../../lib/config'
 
 /*
  * Calendario (booking calendar) — la agenda real de la persona conectada con
@@ -68,7 +68,7 @@ export default function Calendar() {
   useEffect(() => {
     let alive = true
     setState('loading')
-    fetch(`${API_BASE}/api/calendar?action=events&userId=${encodeURIComponent(USER_ID)}`)
+    fetch(`${API_BASE}/api/calendar?action=events&userId=${encodeURIComponent(getUserId())}`)
       .then(r => r.json())
       .then(d => {
         if (!alive) return

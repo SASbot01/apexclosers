@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Loader2 } from 'lucide-react'
 import { CLIENTS } from '../data/mock/clients'
 import { addOrbeConversation } from '../lib/conversations'
-import { API_BASE, USER_ID } from '../lib/config'
+import { API_BASE, getUserId } from '../lib/config'
 
 /*
  * ApexOrb — copiloto IA flotante del shell (el "Orbe").
@@ -82,7 +82,7 @@ export default function ApexOrb() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: USER_ID,
+          userId: getUserId(),
           messages: next.map(m => ({ role: m.role, body: m.body })),
         }),
       })

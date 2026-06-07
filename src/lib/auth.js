@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import { API_BASE } from './config'
+import { API_BASE, setUserId } from './config'
 
 // Sesión de usuario. Login real con Google (vía /api/auth) + fallback "modo
 // demo" para poder usar la app en local sin backend ni claves.
@@ -37,7 +37,7 @@ export function signInDemo() {
 export function signOut() {
   const token = getToken()
   if (token) fetch(`${API_BASE}/api/auth?action=logout&token=${encodeURIComponent(token)}`).catch(() => null)
-  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(DEMO_KEY) } catch { /* off */ }
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(DEMO_KEY); localStorage.removeItem('apex_closer_uid') } catch { /* off */ }
   window.location.href = '/'
 }
 
@@ -53,9 +53,10 @@ export function useSession() {
     if (token) {
       fetch(`${API_BASE}/api/auth?action=me&token=${encodeURIComponent(token)}`)
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(d => { if (alive) setState({ loading: false, user: d.user || demo }) })
-        .catch(() => { if (alive) setState({ loading: false, user: demo }) })
+        .then(d => { const u = d.user || demo; setUserId(u?.id); if (alive) setState({ loading: false, user: u }) })
+        .catch(() => { setUserId(demo?.id); if (alive) setState({ loading: false, user: demo }) })
     } else {
+      setUserId(demo?.id)
       setState({ loading: false, user: demo })
     }
     return () => { alive = false }

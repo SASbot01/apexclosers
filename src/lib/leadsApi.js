@@ -1,5 +1,5 @@
 // Cliente del CRM (/api/leads). Si no hay backend, los hooks/páginas caen a mock.
-import { API_BASE, USER_ID } from './config'
+import { API_BASE, getUserId } from './config'
 
 async function call(action, { method = 'GET', query = {}, body } = {}) {
   const params = new URLSearchParams({ action, ...query })
@@ -12,6 +12,6 @@ async function call(action, { method = 'GET', query = {}, body } = {}) {
   return res.json()
 }
 
-export const listLeads = () => call('list', { query: { userId: USER_ID } }).then(d => d.leads || [])
-export const saveLead = (lead) => call('upsert', { method: 'POST', body: { userId: USER_ID, lead } }).then(d => d.lead)
-export const deleteLead = (id) => call('delete', { method: 'POST', query: { id }, body: { userId: USER_ID } })
+export const listLeads = () => call('list', { query: { userId: getUserId() } }).then(d => d.leads || [])
+export const saveLead = (lead) => call('upsert', { method: 'POST', body: { userId: getUserId(), lead } }).then(d => d.lead)
+export const deleteLead = (id) => call('delete', { method: 'POST', query: { id }, body: { userId: getUserId() } })
