@@ -143,14 +143,31 @@ async function uploadPhoto(req, res) {
   return res.status(200).json({ ok: true, photo_url: url })
 }
 
+// Busca entre TODOS los usuarios que han entrado a la plataforma (tabla users,
+// por nombre o email) + los que tienen perfil (por nickname). Tengan perfil o no.
 async function search(req, res) {
   const q = (req.query.q || '').trim()
+  const viewerId = req.query.viewerId || null
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   if (!q) return res.status(200).json({ results: [] })
-  const { data } = await supabase.from('profiles')
-    .select('user_id, nickname, display_name, headline, photo_url')
-    .or(`nickname.ilike.%${q}%,display_name.ilike.%${q}%`).limit(20)
-  return res.status(200).json({ results: data || [] })
+  const like = `%${q}%`
+  const [{ data: profs }, { data: users }] = await Promise.all([
+    supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url')
+      .or(`nickname.ilike.${like},display_name.ilike.${like}`).limit(25),
+    supabase.from('users').select('id, name, email, picture')
+      .or(`name.ilike.${like},email.ilike.${like}`).limit(25),
+  ])
+  const byId = new Map()
+  for (const p of (profs || [])) byId.set(p.user_id, { user_id: p.user_id, nickname: p.nickname, display_name: p.display_name, headline: p.headline, photo_url: p.photo_url })
+  for (const u of (users || [])) {
+    const ex = byId.get(u.id) || { user_id: u.id, nickname: null, headline: null }
+    ex.display_name = ex.display_name || u.name || (u.email ? u.email.split('@')[0] : 'Closer')
+    ex.photo_url = ex.photo_url || u.picture || null
+    byId.set(u.id, ex)
+  }
+  let results = [...byId.values()]
+  if (viewerId) results = results.filter(r => r.user_id !== viewerId)   // no te listes a ti
+  return res.status(200).json({ results: results.slice(0, 25) })
 }
 
 // Currículum: estructura el perfil + métricas públicas en un CV y, si hay LLM

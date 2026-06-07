@@ -23,7 +23,7 @@ export const getCV         = (userId)   => req('/api/profile', 'cv', { query: { 
 
 // ── Amigos / grupos ──
 export const listFriends   = () => req('/api/friends', 'list', { query: { userId: getUserId() } })
-export const invite        = ({ nick, email }) => req('/api/friends', 'invite', { method: 'POST', body: { userId: getUserId(), nick, email } })
+export const invite        = ({ nick, email, targetId }) => req('/api/friends', 'invite', { method: 'POST', body: { userId: getUserId(), nick, email, targetId } })
 export const respondInvite = (requestId, accept) => req('/api/friends', 'respond', { method: 'POST', body: { userId: getUserId(), requestId, accept } })
 export const removeFriend  = (friendId) => req('/api/friends', 'remove', { method: 'POST', body: { userId: getUserId(), friendId } })
 export const listGroups    = () => req('/api/friends', 'groups', { query: { userId: getUserId() } }).then(d => d.groups || [])

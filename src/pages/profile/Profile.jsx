@@ -223,13 +223,12 @@ function FriendsPanel({ onOpen }) {
   useEffect(() => { load() }, [])
 
   const doSearch = async () => { if (!q.trim()) return setResults([]); setResults(await searchProfiles(q).catch(() => [])) }
-  const doInvite = async (nickOrEmail) => {
+  const doInvite = async (payload) => {
     setMsg(null)
     try {
-      const isEmail = nickOrEmail.includes('@')
-      const r = await invite(isEmail ? { email: nickOrEmail } : { nick: nickOrEmail })
-      setMsg(r.already ? `Ya existe (${r.already}).` : 'Invitación enviada.'); load()
-    } catch (e) { setMsg(e.message === 'user_not_found' ? 'No encontré a nadie con ese nick/email.' : 'No pude invitar.') }
+      const r = await invite(payload)
+      setMsg(r.already ? `Ya conectados (${r.already}).` : 'Invitación enviada.'); load()
+    } catch (e) { setMsg(e.message === 'user_not_found' ? 'No encontré a ese usuario.' : 'No pude invitar.') }
   }
 
   return (
@@ -242,7 +241,7 @@ function FriendsPanel({ onOpen }) {
             <input className="ac-input" style={{ maxWidth: 280 }} placeholder="Buscar por nickname o email…" value={q}
               onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} />
             <button className="ac-btn" style={ghost} onClick={doSearch}>Buscar</button>
-            {q.includes('@') && <button className="ac-btn" onClick={() => doInvite(q)}>Invitar a {q}</button>}
+            {q.includes('@') && <button className="ac-btn" onClick={() => doInvite({ email: q })}>Invitar a {q}</button>}
           </div>
           {msg && <p className="set-note" style={{ marginTop: 10 }}>{msg}</p>}
           {results.length > 0 && (
@@ -251,7 +250,7 @@ function FriendsPanel({ onOpen }) {
                 <div className="pf-friend" key={r.user_id}>
                   <FriendAvatar p={r} />
                   <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(r.user_id)}>{r.display_name}</span>{r.nickname && <span className="pf-friend-nick">@{r.nickname}</span>}</div>
-                  <button className="sales-mini sales-mini--go" onClick={() => doInvite(r.nickname || r.user_id)}>Invitar</button>
+                  <button className="sales-mini sales-mini--go" onClick={() => doInvite({ targetId: r.user_id })}>Invitar</button>
                 </div>
               ))}
             </div>

@@ -74,7 +74,13 @@ async function listFriends(req, res) {
   return res.status(200).json({ friends, incoming, outgoing })
 }
 
-async function findUser({ nick, email }) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function findUser({ nick, email, targetId }) {
+  if (targetId && UUID_RE.test(String(targetId))) {
+    const { data } = await supabase.from('users').select('id').eq('id', targetId).maybeSingle()
+    if (data) return data.id
+  }
   if (nick) {
     const { data } = await supabase.from('profiles').select('user_id').ilike('nickname', String(nick).replace(/^@/, '')).maybeSingle()
     if (data) return data.user_id
@@ -87,18 +93,18 @@ async function findUser({ nick, email }) {
 }
 
 async function invite(req, res) {
-  const { userId, nick, email } = req.body || {}
-  if (!userId || (!nick && !email)) return res.status(400).json({ error: 'userId_and_target_required' })
+  const { userId, nick, email, targetId } = req.body || {}
+  if (!userId || (!nick && !email && !targetId)) return res.status(400).json({ error: 'userId_and_target_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
-  const targetId = await findUser({ nick, email })
-  if (!targetId) return res.status(404).json({ error: 'user_not_found' })
-  if (targetId === userId) return res.status(400).json({ error: 'cannot_invite_self' })
+  const target = await findUser({ nick, email, targetId })
+  if (!target) return res.status(404).json({ error: 'user_not_found' })
+  if (target === userId) return res.status(400).json({ error: 'cannot_invite_self' })
   const { data: existing } = await supabase.from('friendships')
-    .select('id, status').or(`and(requester_id.eq.${userId},addressee_id.eq.${targetId}),and(requester_id.eq.${targetId},addressee_id.eq.${userId})`).maybeSingle()
+    .select('id, status').or(`and(requester_id.eq.${userId},addressee_id.eq.${target}),and(requester_id.eq.${target},addressee_id.eq.${userId})`).maybeSingle()
   if (existing) return res.status(200).json({ ok: true, already: existing.status })
-  const { error } = await supabase.from('friendships').insert({ requester_id: userId, addressee_id: targetId, status: 'pending' })
+  const { error } = await supabase.from('friendships').insert({ requester_id: userId, addressee_id: target, status: 'pending' })
   if (error) return res.status(500).json({ error: error.message })
-  return res.status(200).json({ ok: true, invited: targetId })
+  return res.status(200).json({ ok: true, invited: target })
 }
 
 async function respond(req, res) {
