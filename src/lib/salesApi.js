@@ -1,16 +1,31 @@
 // Cliente de la tabla de ventas (/api/sales) y de las métricas (/api/metrics).
 import { API_BASE, getUserId } from './config'
+import { mockResponse } from '../data/mock/demo'
 
+// Backend con fallback a demo si no hay backend (ver profileApi para el detalle).
 async function call(base, action, { method = 'GET', query = {}, body } = {}) {
   const params = new URLSearchParams({ action, ...query })
-  const res = await fetch(`${API_BASE}${base}?${params.toString()}`, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const data = await res.json().catch(() => ({}))
+  let res
+  try {
+    res = await fetch(`${API_BASE}${base}?${params.toString()}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    return mockOrThrow(base, action, { query, body })
+  }
+  let data, ok = true
+  try { data = await res.json() } catch { ok = false }
+  if (!ok) return mockOrThrow(base, action, { query, body })
   if (!res.ok) throw new Error(data.error || `api ${res.status}`)
   return data
+}
+
+function mockOrThrow(base, action, ctx) {
+  const m = mockResponse(base, action, ctx)
+  if (m !== undefined) return m
+  throw new Error('backend_unavailable')
 }
 
 // ── Ventas ──

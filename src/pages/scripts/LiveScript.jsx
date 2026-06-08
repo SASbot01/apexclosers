@@ -141,6 +141,11 @@ export default function LiveScript() {
             <div style={{ marginTop: 10, fontSize: 11, color: 'var(--apex-plat-low)', letterSpacing: '0.02em' }}>
               Atajos: ← → cambian de fase · espacio = siguiente
             </div>
+            <div className="live-wave" aria-hidden="true">
+              {Array.from({ length: 56 }).map((_, k) => (
+                <span key={k} style={{ animationDelay: `${((k * 0.05) % 1).toFixed(2)}s` }} />
+              ))}
+            </div>
           </div>
 
           <aside className="live-side">
@@ -215,6 +220,6 @@ const LIVE_CO_CSS = `
 .live-co-chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .live-co-input { display: flex; gap: 6px; }
 .live-co-input .ac-input { flex: 1; min-width: 0; }
-.live-co-sug { padding: 9px 11px; background: color-mix(in srgb, #6FCF9C 12%, var(--apex-trigger-bg)); border: 1px solid color-mix(in srgb, #6FCF9C 40%, var(--apex-border)); color: var(--apex-plat-hi); font-size: 12.5px; line-height: 1.5; }
+.live-co-sug { padding: 9px 11px; background: color-mix(in srgb, var(--apex-status-pos) 12%, var(--apex-trigger-bg)); border: 1px solid color-mix(in srgb, var(--apex-status-pos) 40%, var(--apex-border)); color: var(--apex-plat-hi); font-size: 12.5px; line-height: 1.5; }
 `
 

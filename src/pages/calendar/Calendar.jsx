@@ -332,7 +332,7 @@ const CAL_CSS = `
 .cal2-now { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid #E58371; z-index: 5; }
 .cal2-now-dot { position: absolute; left: -4px; top: -4px; width: 7px; height: 7px; border-radius: 50%; background: #E58371; }
 .cal2-pill { position: absolute; left: 3px; right: 3px; display: flex; flex-direction: column; gap: 1px; padding: 3px 6px; background: color-mix(in srgb, #8AC8E0 22%, var(--apex-bg-deep, #0c0e14)); border: 1px solid #8AC8E0; border-left: 3px solid #8AC8E0; color: var(--apex-plat-hi); text-align: left; cursor: pointer; overflow: hidden; z-index: 4; box-sizing: border-box; }
-.cal2-pill[data-sale] { background: color-mix(in srgb, #6FCF9C 22%, var(--apex-bg-deep, #0c0e14)); border-color: #6FCF9C; border-left-color: #6FCF9C; }
+.cal2-pill[data-sale] { background: color-mix(in srgb, var(--apex-status-pos) 22%, var(--apex-bg-deep, #0c0e14)); border-color: var(--apex-status-pos); border-left-color: var(--apex-status-pos); }
 .cal2-pill:hover { filter: brightness(1.12); z-index: 6; }
 .cal2-pill-time { font-size: 9.5px; opacity: 0.85; }
 .cal2-pill-name { font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -342,7 +342,7 @@ const CAL_CSS = `
 .cal2-ag-date { font-size: 12px; color: var(--apex-plat-mid); text-transform: capitalize; letter-spacing: 0.03em; }
 .cal2-ag-items { display: flex; flex-direction: column; gap: 4px; }
 .cal2-ag-row { display: grid; grid-template-columns: 52px 10px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; background: var(--apex-card-bg, rgba(255,255,255,0.02)); border: 1px solid var(--apex-border); border-left: 3px solid #8AC8E0; color: var(--apex-plat-hi); text-align: left; cursor: pointer; }
-.cal2-ag-row[data-sale] { border-left-color: #6FCF9C; }
+.cal2-ag-row[data-sale] { border-left-color: var(--apex-status-pos); }
 .cal2-ag-row:hover { background: var(--apex-trigger-bg); }
 .cal2-ag-time { font-size: 12px; color: var(--apex-plat-hi); }
 .cal2-ag-dot { width: 8px; height: 8px; border-radius: 50%; background: #8AC8E0; }

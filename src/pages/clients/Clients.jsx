@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
+import ClientLock from '../../components/ClientLock'
 import { listSales, saveSale, deleteSale as apiDeleteSale, verifySale, uploadProof, fileToDataUrl } from '../../lib/salesApi'
 
 /*
@@ -14,7 +16,7 @@ const fmtDay = (iso) => { try { return new Date(iso).toLocaleDateString('es-ES',
 const PAY_TYPES = ['Pago único', 'Cuotas']
 const STATUS_META = {
   pending:  { label: 'Pendiente', color: '#F2A765' },
-  verified: { label: 'Verificada', color: '#6FCF9C' },
+  verified: { label: 'Verificada', color: 'var(--apex-status-pos)' },
   rejected: { label: 'Rechazada', color: '#E58371' },
 }
 
@@ -24,6 +26,8 @@ export default function Clients() {
   const [busy, setBusy] = useState({})           // id → 'proof' | 'verify'
   const saveTimers = useRef({})
   const fileInputs = useRef({})
+  const [searchParams] = useSearchParams()
+  const lockedClient = searchParams.get('client') || null   // vista bloqueada a una cuenta (vía equipo)
 
   const load = () => {
     setState('loading')
@@ -33,8 +37,10 @@ export default function Clients() {
   }
   useEffect(load, [])
 
-  const verified = sales.filter(s => s.status === 'verified')
-  const pending = sales.filter(s => s.status === 'pending')
+  // En vista bloqueada (vía equipo) solo se ven las ventas de esa cuenta.
+  const visibleSales = lockedClient ? sales.filter(s => s.client_id === lockedClient) : sales
+  const verified = visibleSales.filter(s => s.status === 'verified')
+  const pending = visibleSales.filter(s => s.status === 'pending')
   const kpis = [
     { label: 'Revenue verificado', value: money(verified.reduce((a, s) => a + Number(s.revenue || 0), 0)) },
     { label: 'Cash verificado', value: money(verified.reduce((a, s) => a + Number(s.cash_collected || 0), 0)) },
@@ -86,8 +92,11 @@ export default function Clients() {
 
   return (
     <>
-      <FloatingHeader title="Ventas" eyebrow="TABLA DE VENTAS" actions={
-        <button className="ac-btn" onClick={addSale}>+ Venta</button>
+      <FloatingHeader title="Ventas" eyebrow={lockedClient ? 'VENTAS · CLIENTE' : 'TABLA DE VENTAS'} actions={
+        <div style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+          {lockedClient && <ClientLock clientId={lockedClient} />}
+          {!lockedClient && <button className="ac-btn" onClick={addSale}>+ Venta</button>}
+        </div>
       } />
 
       <section className="apex-section">
@@ -111,7 +120,7 @@ export default function Clients() {
                 </tr>
               </thead>
               <tbody>
-                {sales.map(s => {
+                {visibleSales.map(s => {
                   const st = STATUS_META[s.status] || STATUS_META.pending
                   const isBusy = busy[s.id]
                   return (
@@ -154,7 +163,7 @@ export default function Clients() {
                     </tr>
                   )
                 })}
-                {state === 'live' && sales.length === 0 && <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>Sin ventas todavía. Pulsa “+ Venta” o cierra una en una llamada.</td></tr>}
+                {state === 'live' && visibleSales.length === 0 && <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>{lockedClient ? 'Sin ventas en esta cuenta.' : 'Sin ventas todavía. Pulsa “+ Venta” o cierra una en una llamada.'}</td></tr>}
                 {state === 'loading' && <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>Cargando…</td></tr>}
               </tbody>
             </table>
@@ -178,7 +187,7 @@ const SALES_CSS = `
 .sales-mini { background: transparent; border: 1px solid var(--apex-border); color: var(--apex-plat-mid); font-family: var(--apex-font); font-size: 11px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
 .sales-mini:hover:not(:disabled) { color: var(--apex-plat-hi); border-color: var(--apex-plat-mid); }
 .sales-mini:disabled { opacity: 0.4; cursor: not-allowed; }
-.sales-mini--go { border-color: color-mix(in srgb, #6FCF9C 45%, transparent); color: #6FCF9C; }
+.sales-mini--go { border-color: color-mix(in srgb, var(--apex-status-pos) 45%, transparent); color: var(--apex-status-pos); }
 .sales-mini--del { border-color: transparent; color: var(--apex-plat-low); padding: 4px 6px; }
 .sales-mini--del:hover { color: #E58371; }
 `

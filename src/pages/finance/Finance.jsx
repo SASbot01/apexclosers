@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import FloatingHeader from '../../components/FloatingHeader'
 import SegTabs from '../../components/SegTabs'
+import ProgressRing from '../../components/ProgressRing'
+import AnimatedValue from '../../components/AnimatedValue'
 import { getMetrics, listSales } from '../../lib/salesApi'
 import { inWindow } from '../../lib/filters'
 
@@ -65,10 +67,15 @@ export default function Finance() {
         </p>
         {state === 'error' && <div className="apex-card" style={{ padding: 16, color: 'var(--apex-plat-mid)' }}>No pude cargar las métricas (¿backend?).</div>}
         <div className="mx-cards">
-          {list.map(m => (
+          {list.map(m => m.fmt === 'pct' ? (
+            <div className="apex-card mx-card mx-card--ring" key={m.key} data-public={m.public || undefined}>
+              <ProgressRing value={m.value} size={92} stroke={8} card={false} />
+              <span className="mx-card-label">{m.label}</span>
+            </div>
+          ) : (
             <div className="apex-card mx-card" key={m.key} data-public={m.public || undefined}>
               <span className="mx-card-label">{m.label}</span>
-              <span className="mx-card-value">{fmtVal(m.fmt, m.value)}</span>
+              <span className="mx-card-value"><AnimatedValue value={m.value} fmt={m.fmt} /></span>
             </div>
           ))}
           {state === 'loading' && <div className="apex-card mx-card"><span className="mx-card-label">Cargando…</span></div>}
@@ -90,16 +97,16 @@ export default function Finance() {
               <AreaChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="fxFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#D5DAE3" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#D5DAE3" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--apex-chart-line-2)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--apex-chart-line-2)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="rgba(154,163,178,0.12)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDay} tick={{ fill: '#7A8494', fontSize: 11 }} stroke="rgba(154,163,178,0.2)" />
-                <YAxis tick={{ fill: '#7A8494', fontSize: 11 }} stroke="rgba(154,163,178,0.2)" width={48} />
-                <Tooltip contentStyle={{ background: '#0d0f15', border: '1px solid #2a2f3a', color: '#FAFBFE', fontSize: 12 }} labelFormatter={fmtDay}
+                <CartesianGrid stroke="var(--apex-chart-grid)" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={fmtDay} tick={{ fill: 'var(--apex-chart-tick)', fontSize: 11 }} stroke="var(--apex-chart-axis)" />
+                <YAxis tick={{ fill: 'var(--apex-chart-tick)', fontSize: 11 }} stroke="var(--apex-chart-axis)" width={48} />
+                <Tooltip contentStyle={{ background: 'var(--apex-panel-bg)', border: '1px solid var(--apex-border-strong)', color: 'var(--apex-plat-hi)', fontSize: 12 }} labelFormatter={fmtDay}
                   formatter={(v) => metric === 'deals' ? [v, 'Cierres'] : [money(v), CHART_METRICS.find(m => m.key === metric)?.label]} />
-                <Area type="monotone" dataKey={metric} stroke="#D5DAE3" strokeWidth={1.5} fill="url(#fxFill)" />
+                <Area type="monotone" dataKey={metric} stroke="var(--apex-chart-line-2)" strokeWidth={2} fill="url(#fxFill)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -114,12 +121,14 @@ export default function Finance() {
 
 const MX_CSS = `
 .mx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-.mx-card { padding: 16px; display: flex; flex-direction: column; gap: 6px; position: relative; }
-.mx-card[data-public] { border-color: color-mix(in srgb, #6FCF9C 40%, var(--apex-border)); }
+.mx-card { padding: 16px; display: flex; flex-direction: column; gap: 6px; position: relative; min-height: 118px; justify-content: center; }
+.mx-card--ring { align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 12px; }
+.mx-card--ring .ring-card { padding: 0; gap: 8px; }
+.mx-card[data-public] { border-color: color-mix(in srgb, var(--apex-status-pos) 40%, var(--apex-border)); }
 .mx-card-label { font-size: 11.5px; color: var(--apex-plat-low); text-transform: uppercase; letter-spacing: 0.06em; }
 .mx-card-value { font-size: 22px; color: var(--apex-plat-hi); font-family: var(--apex-font); }
 .mx-vis { margin-top: 4px; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--apex-border); color: var(--apex-plat-low); font-family: var(--apex-font); font-size: 11px; padding: 3px 8px; cursor: pointer; }
 .mx-vis-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--apex-plat-low); }
-.mx-vis[data-on] { color: #6FCF9C; border-color: color-mix(in srgb, #6FCF9C 45%, transparent); }
-.mx-vis[data-on] .mx-vis-dot { background: #6FCF9C; }
+.mx-vis[data-on] { color: var(--apex-status-pos); border-color: color-mix(in srgb, var(--apex-status-pos) 45%, transparent); }
+.mx-vis[data-on] .mx-vis-dot { background: var(--apex-status-pos); }
 `

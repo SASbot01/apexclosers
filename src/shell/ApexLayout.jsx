@@ -17,11 +17,11 @@ import NotificationsBell from './NotificationsBell'
 // Las sub-vistas (Guion dentro de Llamadas; Embudo dentro de Métricas) se
 // cambian con un control segmentado. Ajustes vive en el engranaje de la topbar.
 const SECTIONS = [
-  { key: 'home',     label: 'Hoy',      path: '/' },
-  { key: 'clientes', label: 'Ventas',   path: '/clientes' },
-  { key: 'llamadas', label: 'Llamadas', path: '/llamadas' },
+  { key: 'perfil',   label: 'Perfil',      path: '/perfil' },
+  { key: 'workshop', label: 'Workshop',    path: '/workshop' },
+  { key: 'clientes', label: 'Ventas',      path: '/clientes' },
+  { key: 'llamadas', label: 'Llamadas',    path: '/llamadas' },
   { key: 'pipeline', label: 'Leads (CRM)', path: '/pipeline' },
-  { key: 'perfil',   label: 'Perfil',   path: '/perfil' },
 ]
 
 export default function ApexLayout() {
@@ -83,13 +83,14 @@ export default function ApexLayout() {
 
 function sectionKeyForPath(sections, pathname) {
   // Sub-vistas que viven bajo otra sección.
+  if (pathname.startsWith('/workshop')) return 'workshop'
   if (pathname.startsWith('/scripts') || pathname.startsWith('/calendario')) return 'llamadas'
   // Métricas (evolución/embudo) viven ahora bajo el Perfil.
   if (pathname.startsWith('/perfil') || pathname.startsWith('/reports') || pathname.startsWith('/finanzas')) return 'perfil'
   if (pathname.startsWith('/ajustes')) return '' // engranaje, sin tab activa
   const sorted = [...sections].sort((a, b) => b.path.length - a.path.length)
   const match = sorted.find(s => pathname === s.path || pathname.startsWith(s.path + '/'))
-  return match?.key ?? 'home'
+  return match?.key ?? 'perfil'
 }
 
 function SectionNav({ sections, active }) {
@@ -128,7 +129,7 @@ function MobileSectionMenu({ sections, active, pathname }) {
   const ref = useRef(null)
   const navigate = useNavigate()
 
-  const currentLabel = sections.find(s => s.key === active)?.label || 'Home'
+  const currentLabel = sections.find(s => s.key === active)?.label || 'Perfil'
 
   useEffect(() => {
     if (!open) return
@@ -194,9 +195,9 @@ function ApexMark() {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="apex-mark-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="var(--apex-plat-hi)" />
-          <stop offset="55%"  stopColor="var(--apex-plat-mid)" />
-          <stop offset="100%" stopColor="var(--apex-plat-shad)" />
+          <stop offset="0%"   stopColor="var(--apex-mark-1, var(--apex-plat-hi))" />
+          <stop offset="55%"  stopColor="var(--apex-mark-2, var(--apex-plat-mid))" />
+          <stop offset="100%" stopColor="var(--apex-mark-3, var(--apex-plat-shad))" />
         </linearGradient>
       </defs>
       <path d="M12 3 L21 21 L12 16 L3 21 Z" fill="url(#apex-mark-grad)" />

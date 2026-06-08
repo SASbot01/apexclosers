@@ -20,7 +20,7 @@ export default function FloatingHeader({ title = 'Home', eyebrow = 'SECCIÓN', t
         <div className="apex-floating-header-left">
           <span className="apex-floating-tick" aria-hidden="true" />
           <div className="apex-floating-header-meta">
-            <span className="apex-eyebrow">{eyebrow}</span>
+            {eyebrow && <span className="apex-eyebrow">{eyebrow}</span>}
             <h1 className="apex-floating-header-title">{title}</h1>
           </div>
           {titleExtra && <div className="apex-floating-header-extra">{titleExtra}</div>}

@@ -1,13 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
-// Réplica del sistema de temas de Apex Operations (4 temas vía [data-theme]).
+// Sistema de temas vía [data-theme]. 3 temas: Apex Neón (principal · verde/negro),
+// Apex Dark (el oscuro original) y Apex Light.
 const STORAGE_KEY = 'apex_closer_theme'
-const DEFAULT_THEME = 'dark'
+const DEFAULT_THEME = 'neon'
 export const THEMES = [
-  { key: 'dark',     label: 'Apex Dark' },
-  { key: 'light',    label: 'Apex Light' },
-  { key: 'obsidian', label: 'Obsidian' },
-  { key: 'pizarra',  label: 'Pizarra' },
+  { key: 'neon',  label: 'Apex Neón' },
+  { key: 'dark',  label: 'Apex Dark' },
+  { key: 'light', label: 'Apex Light' },
 ]
 
 const ApexThemeContext = createContext({ theme: DEFAULT_THEME, setTheme: () => {} })

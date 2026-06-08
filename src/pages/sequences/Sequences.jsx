@@ -112,7 +112,7 @@ export default function Sequences() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontSize: 14, color: 'var(--apex-plat-hi)' }}>{s.name}</span>
-                <span className="sales-badge" style={{ '--c': s.active ? '#6FCF9C' : 'var(--apex-plat-low)', marginLeft: 10 }}>{s.active ? 'Activa' : 'Pausada'}</span>
+                <span className="sales-badge" style={{ '--c': s.active ? 'var(--apex-status-pos)' : 'var(--apex-plat-low)', marginLeft: 10 }}>{s.active ? 'Activa' : 'Pausada'}</span>
                 <div style={{ fontSize: 12, color: 'var(--apex-plat-low)', marginTop: 4 }}>Dispara en: <b>{stateLabel(s.trigger_state)}</b> · {(s.steps || []).length} paso(s)</div>
               </div>
               <div style={{ display: 'inline-flex', gap: 6 }}>
@@ -138,7 +138,7 @@ export default function Sequences() {
                       <td>{t.channel}</td>
                       <td>{t.type === 'confirmacion' ? 'Confirmación' : 'Seguimiento'}</td>
                       <td style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message || '—'}</td>
-                      <td><span className="sales-badge" style={{ '--c': t.status === 'sent' ? '#6FCF9C' : '#F2A765' }}>{t.status === 'sent' ? 'Hecha' : 'Pendiente'}</span></td>
+                      <td><span className="sales-badge" style={{ '--c': t.status === 'sent' ? 'var(--apex-status-pos)' : '#F2A765' }}>{t.status === 'sent' ? 'Hecha' : 'Pendiente'}</span></td>
                     </tr>
                   ))}
                 </tbody>
