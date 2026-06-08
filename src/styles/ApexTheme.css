@@ -1,5 +1,5 @@
 /* APEX Theme PDR v2.0 · Hybrid · Cinematic Edition
- * 4 themes: dark (default) · light · obsidian · pizarra
+ * 3 themes: neon (Apex Neón · default) · dark · light
  * Scoped under .apex-ops to prevent leaking into other tenants.
  * Theme tokens are redefined per [data-theme]; components reference vars
  * and re-themed automatically without changes. */
@@ -46,13 +46,9 @@ html:has(.apex-ops[data-theme="light"]),
 body:has(.apex-ops[data-theme="light"]) {
   background: #EEF0F3;
 }
-html:has(.apex-ops[data-theme="obsidian"]),
-body:has(.apex-ops[data-theme="obsidian"]) {
-  background: #000000;
-}
-html:has(.apex-ops[data-theme="pizarra"]),
-body:has(.apex-ops[data-theme="pizarra"]) {
-  background: #060606;
+html:has(.apex-ops[data-theme="neon"]),
+body:has(.apex-ops[data-theme="neon"]) {
+  background: #0C0F0D;
 }
 
 .apex-ops,
@@ -100,6 +96,17 @@ body:has(.apex-ops[data-theme="pizarra"]) {
   --apex-chart-grid:   rgba(154, 163, 178, 0.07);
   --apex-chart-axis:   rgba(154, 163, 178, 0.5);
   --apex-chart-tick:   rgba(154, 163, 178, 0.6);
+
+  /* Accent → aliased to platinum so DARK stays pixel-identical. */
+  --apex-accent:      var(--apex-plat-hi);
+  --apex-accent-h:    var(--apex-plat-mid);
+  --apex-accent-ink:  var(--apex-bg-deep);
+  --apex-accent-line: var(--apex-plat-hi);
+  --apex-accent-soft: var(--apex-alpha-3);
+  --apex-glow:        none;
+  --apex-mark-1: var(--apex-plat-hi);
+  --apex-mark-2: var(--apex-plat-mid);
+  --apex-mark-3: var(--apex-plat-shad);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -150,182 +157,94 @@ body:has(.apex-ops[data-theme="pizarra"]) {
   --apex-chart-grid:   rgba(10, 11, 20, 0.06);
   --apex-chart-axis:   rgba(10, 11, 20, 0.5);
   --apex-chart-tick:   rgba(10, 11, 20, 0.55);
+
+  /* Accent → aliased to platinum so LIGHT stays pixel-identical. */
+  --apex-accent:      var(--apex-plat-hi);
+  --apex-accent-h:    var(--apex-plat-mid);
+  --apex-accent-ink:  var(--apex-bg-deep);
+  --apex-accent-line: var(--apex-plat-hi);
+  --apex-accent-soft: var(--apex-alpha-3);
+  --apex-glow:        none;
+  --apex-mark-1: var(--apex-plat-hi);
+  --apex-mark-2: var(--apex-plat-mid);
+  --apex-mark-3: var(--apex-plat-shad);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * 4 · Theme tokens — OBSIDIAN
- *     Pure black & white. No color anywhere, not even on status.
+ * 4 · Theme tokens — NEON (Apex Neón · default)
+ *     Lime-green accent on near-black. The new signature Apex Closers look.
  * ───────────────────────────────────────────────────────────────────────── */
-.apex-ops[data-theme="obsidian"] {
-  --apex-bg-deep:    #000000;
-  --apex-bg:         #000000;
-  --apex-bg-soft:    #050505;
-  --apex-surface:    #0A0A0A;
-  --apex-surface-hi: #111111;
+.apex-ops[data-theme="neon"] {
+  --apex-bg-deep:    #0C0F0D;
+  --apex-bg:         #0E120F;
+  --apex-bg-soft:    #121613;
+  --apex-surface:    #181C19;
+  --apex-surface-hi: #1E231F;
 
-  --apex-plat-hi:   #FFFFFF;
-  --apex-plat-mid:  #D0D0D0;
-  --apex-plat-low:  #888888;
-  --apex-plat-shad: #555555;
-  --apex-plat-deep: #222222;
+  /* Platinum ramp — slightly warm/green-tinted whites for the neon ground */
+  --apex-plat-hi:   #F3F7EF;
+  --apex-plat-mid:  #CFD6CB;
+  --apex-plat-low:  #93A08F;
+  --apex-plat-shad: #4C564A;
+  --apex-plat-deep: #1B211A;
 
   --apex-alpha-1: rgba(255,255,255, 0.02);
-  --apex-alpha-2: rgba(255,255,255, 0.05);
-  --apex-alpha-3: rgba(255,255,255, 0.08);
-  --apex-alpha-4: rgba(255,255,255, 0.16);
+  --apex-alpha-2: rgba(255,255,255, 0.04);
+  --apex-alpha-3: rgba(255,255,255, 0.06);
+  --apex-alpha-4: rgba(255,255,255, 0.12);
 
-  --apex-border:        rgba(255, 255, 255, 0.15);
-  --apex-border-strong: rgba(255, 255, 255, 0.30);
-  --apex-border-soft:   rgba(255, 255, 255, 0.08);
+  --apex-border:        rgba(150, 172, 148, 0.16);
+  --apex-border-strong: rgba(168, 214, 120, 0.34);
+  --apex-border-soft:   rgba(150, 172, 148, 0.09);
 
-  --apex-card-bg:    linear-gradient(180deg, #0C0C0C 0%, #060606 55%, #000000 100%);
-  --apex-card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
-  --apex-inset-top: rgba(255, 255, 255, 0.07);
-  --apex-inset-bot: rgba(0, 0, 0, 0.6);
-  --apex-anchor:    rgba(0, 0, 0, 0.6);
+  /* Flat panels — clearly readable as cards over the flat bg, no green wash. */
+  --apex-card-bg:    linear-gradient(180deg, #191D1A 0%, #151916 100%);
+  --apex-card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent);
+  --apex-inset-top: rgba(255, 255, 255, 0.045);
+  --apex-inset-bot: rgba(0, 0, 0, 0.4);
+  --apex-anchor:    rgba(0, 0, 0, 0.45);
 
-  --apex-panel-bg:     #050505;
-  --apex-trigger-bg:   rgba(8, 8, 8, 0.7);
-  --apex-trigger-bg-h: #161616;
+  --apex-panel-bg:     #141815;
+  --apex-trigger-bg:   rgba(28, 33, 29, 0.55);
+  --apex-trigger-bg-h: rgba(38, 44, 39, 0.85);
 
-  /* Status: same monochrome, only direction (arrow) differentiates */
-  --apex-status-pos: #FFFFFF;
-  --apex-status-neg: #888888;
+  --apex-status-pos: #B2F23C;
+  --apex-status-neg: #E58371;
 
-  --apex-chart-line-1: #444444;
-  --apex-chart-line-2: #BBBBBB;
-  --apex-chart-line-3: #FFFFFF;
-  --apex-chart-area-1: rgba(255, 255, 255, 0.16);
-  --apex-chart-area-2: rgba(255, 255, 255, 0.03);
-  --apex-chart-grid:   rgba(255, 255, 255, 0.06);
-  --apex-chart-axis:   rgba(255, 255, 255, 0.45);
-  --apex-chart-tick:   rgba(255, 255, 255, 0.55);
+  /* Accent — lime green (the signature). Used by buttons, bars, active states. */
+  --apex-accent:      #B2F23C;
+  --apex-accent-h:    #C6FA5C;
+  --apex-accent-ink:  #0A0E07;
+  --apex-accent-line: #B2F23C;
+  --apex-accent-soft: rgba(178, 242, 60, 0.14);
+  --apex-glow:        0 0 22px rgba(178, 242, 60, 0.28);
+
+  /* Rounded corners (neon only — dark/light stay sharp via the scoped layer) */
+  --apex-radius:      14px;
+  --apex-radius-sm:   9px;
+  --apex-radius-pill: 999px;
+
+  /* Brand mark gradient — green */
+  --apex-mark-1: #C6FA5C;
+  --apex-mark-2: #B2F23C;
+  --apex-mark-3: #6FA32B;
+
+  --apex-chart-line-1: #4C6A2E;
+  --apex-chart-line-2: #8BD13A;
+  --apex-chart-line-3: #B2F23C;
+  --apex-chart-area-1: rgba(178, 242, 60, 0.30);
+  --apex-chart-area-2: rgba(178, 242, 60, 0.02);
+  --apex-chart-grid:   rgba(150, 172, 148, 0.08);
+  --apex-chart-axis:   rgba(150, 172, 148, 0.45);
+  --apex-chart-tick:   rgba(150, 172, 148, 0.55);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
- * 5 · Theme tokens — PIZARRA (BLACK chalkboard)
- *     Deep black ground, chalk-cream text, colored chalk metrics + funnel.
- * ───────────────────────────────────────────────────────────────────────── */
-.apex-ops[data-theme="pizarra"] {
-  --apex-bg-deep:    #060606;
-  --apex-bg:         #0A0A0A;
-  --apex-bg-soft:    #0E0E0E;
-  --apex-surface:    #121212;
-  --apex-surface-hi: #161616;
-
-  --apex-plat-hi:   #F8F4E3;
-  --apex-plat-mid:  #DDD4B8;
-  --apex-plat-low:  #B0A88A;
-  --apex-plat-shad: #6F6850;
-  --apex-plat-deep: #2B2A23;
-
-  --apex-alpha-1: rgba(245, 244, 227, 0.025);
-  --apex-alpha-2: rgba(245, 244, 227, 0.05);
-  --apex-alpha-3: rgba(245, 244, 227, 0.08);
-  --apex-alpha-4: rgba(245, 244, 227, 0.16);
-
-  --apex-border:        rgba(245, 244, 227, 0.18);
-  --apex-border-strong: rgba(245, 244, 227, 0.34);
-  --apex-border-soft:   rgba(245, 244, 227, 0.10);
-
-  --apex-card-bg:    linear-gradient(180deg, #181818 0%, #0E0E0E 55%, #050505 100%);
-  --apex-card-sheen: linear-gradient(180deg, rgba(245, 244, 227, 0.045), transparent);
-  --apex-inset-top: rgba(245, 244, 227, 0.07);
-  --apex-inset-bot: rgba(0, 0, 0, 0.55);
-  --apex-anchor:    rgba(0, 0, 0, 0.6);
-
-  --apex-panel-bg:     #0B0B0B;
-  --apex-trigger-bg:   rgba(12, 12, 12, 0.78);
-  --apex-trigger-bg-h: rgba(28, 28, 28, 0.88);
-
-  --apex-status-pos: #B4DD9C;
-  --apex-status-neg: #F4A8A8;
-
-  /* Chart line uses warm chalk-yellow against the black slate */
-  --apex-chart-line-1: #7C7458;
-  --apex-chart-line-2: #DDD4B8;
-  --apex-chart-line-3: #F4D35E;
-  --apex-chart-area-1: rgba(244, 211, 94, 0.20);
-  --apex-chart-area-2: rgba(245, 244, 227, 0.04);
-  --apex-chart-grid:   rgba(245, 244, 227, 0.07);
-  --apex-chart-axis:   rgba(245, 244, 227, 0.5);
-  --apex-chart-tick:   rgba(245, 244, 227, 0.55);
+/* Neon · greened chrome + glow signatures (only this theme; dark/light unchanged) */
+.apex-ops[data-theme="neon"] .apex-scroll-progress {
+  background: linear-gradient(90deg, #4C6A2E, #8BD13A, #B2F23C);
 }
-
-/* Pizarra · funnel bars in chalk colors per stage. */
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="opt_ins"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(244, 211, 94, 0.25), rgba(244, 211, 94, 0.70) 50%, rgba(244, 211, 94, 0.25));
-  border-left-color:  rgba(244, 211, 94, 0.45);
-  border-right-color: rgba(244, 211, 94, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="contacted"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(180, 221, 156, 0.25), rgba(180, 221, 156, 0.70) 50%, rgba(180, 221, 156, 0.25));
-  border-left-color:  rgba(180, 221, 156, 0.45);
-  border-right-color: rgba(180, 221, 156, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_offered"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(138, 200, 224, 0.25), rgba(138, 200, 224, 0.70) 50%, rgba(138, 200, 224, 0.25));
-  border-left-color:  rgba(138, 200, 224, 0.45);
-  border-right-color: rgba(138, 200, 224, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_scheduled"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(244, 166, 184, 0.25), rgba(244, 166, 184, 0.70) 50%, rgba(244, 166, 184, 0.25));
-  border-left-color:  rgba(244, 166, 184, 0.45);
-  border-right-color: rgba(244, 166, 184, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_showed"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(242, 167, 101, 0.25), rgba(242, 167, 101, 0.70) 50%, rgba(242, 167, 101, 0.25));
-  border-left-color:  rgba(242, 167, 101, 0.45);
-  border-right-color: rgba(242, 167, 101, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="closes"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(242, 133, 138, 0.25), rgba(242, 133, 138, 0.70) 50%, rgba(242, 133, 138, 0.25));
-  border-left-color:  rgba(242, 133, 138, 0.45);
-  border-right-color: rgba(242, 133, 138, 0.45);
-}
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="upsell"] .apex-funnel-bar {
-  background: linear-gradient(90deg, rgba(200, 162, 224, 0.25), rgba(200, 162, 224, 0.70) 50%, rgba(200, 162, 224, 0.25));
-  border-left-color:  rgba(200, 162, 224, 0.45);
-  border-right-color: rgba(200, 162, 224, 0.45);
-}
-/* Funnel value number in pizarra picks up the same chalk hue as the bar. */
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="opt_ins"]         .apex-funnel-num { color: #F4D35E; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="contacted"]       .apex-funnel-num { color: #B4DD9C; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_offered"]   .apex-funnel-num { color: #8AC8E0; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_scheduled"] .apex-funnel-num { color: #F4A6B8; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="calls_showed"]    .apex-funnel-num { color: #F2A765; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="closes"]          .apex-funnel-num { color: #F2858A; }
-.apex-ops[data-theme="pizarra"] .apex-funnel-row[data-stage="upsell"]          .apex-funnel-num { color: #C8A2E0; }
-
-/* Pizarra · Reports funnel bars in chalk colors per stage index. The Reports
-   funnel uses dynamic role-specific stages, so we key off the index (0..4)
-   instead of the stage name. Mirrors the Home funnel palette. */
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="0"] .apex-reports-funnel-bar {
-  background: linear-gradient(90deg, rgba(244, 211, 94, 0.30), rgba(244, 211, 94, 0.85) 50%, rgba(244, 211, 94, 0.30));
-  border-color: rgba(244, 211, 94, 0.55);
-}
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="1"] .apex-reports-funnel-bar {
-  background: linear-gradient(90deg, rgba(180, 221, 156, 0.30), rgba(180, 221, 156, 0.85) 50%, rgba(180, 221, 156, 0.30));
-  border-color: rgba(180, 221, 156, 0.55);
-}
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="2"] .apex-reports-funnel-bar {
-  background: linear-gradient(90deg, rgba(138, 200, 224, 0.30), rgba(138, 200, 224, 0.85) 50%, rgba(138, 200, 224, 0.30));
-  border-color: rgba(138, 200, 224, 0.55);
-}
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="3"] .apex-reports-funnel-bar {
-  background: linear-gradient(90deg, rgba(244, 166, 184, 0.30), rgba(244, 166, 184, 0.85) 50%, rgba(244, 166, 184, 0.30));
-  border-color: rgba(244, 166, 184, 0.55);
-}
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="4"] .apex-reports-funnel-bar {
-  background: linear-gradient(90deg, rgba(242, 133, 138, 0.30), rgba(242, 133, 138, 0.85) 50%, rgba(242, 133, 138, 0.30));
-  border-color: rgba(242, 133, 138, 0.55);
-}
-/* The big numeric on the right of each row picks up the matching chalk hue. */
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="0"] .apex-reports-funnel-num { color: #F4D35E; }
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="1"] .apex-reports-funnel-num { color: #B4DD9C; }
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="2"] .apex-reports-funnel-num { color: #8AC8E0; }
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="3"] .apex-reports-funnel-num { color: #F4A6B8; }
-.apex-ops[data-theme="pizarra"] .apex-reports-funnel-row[data-stage-idx="4"] .apex-reports-funnel-num { color: #F2858A; }
+.apex-ops[data-theme="neon"] .ac-btn:hover:not(:disabled) { box-shadow: var(--apex-glow); }
+.apex-ops[data-theme="neon"] .seg-btn[data-active] { color: var(--apex-accent); }
 
 /* ─────────────────────────────────────────────────────────────────────────
  * 6 · Type primitives
@@ -887,13 +806,13 @@ body:has(.apex-ops[data-theme="pizarra"]) {
   border-color: var(--apex-plat-hi);
 }
 .apex-ops .apex-btn--primary {
-  background: var(--apex-plat-hi);
-  color: var(--apex-bg);
-  border-color: var(--apex-plat-hi);
+  background: var(--apex-accent, var(--apex-plat-hi));
+  color: var(--apex-accent-ink, var(--apex-bg));
+  border-color: var(--apex-accent, var(--apex-plat-hi));
 }
 .apex-ops .apex-btn--primary:hover {
   background: transparent;
-  color: var(--apex-plat-hi);
+  color: var(--apex-accent, var(--apex-plat-hi));
 }
 .apex-ops .apex-btn--ghost {
   border-color: transparent;
@@ -909,16 +828,8 @@ body:has(.apex-ops[data-theme="pizarra"]) {
  * 10 · Atmospheric canvas — visibility per theme
  * ───────────────────────────────────────────────────────────────────────── */
 .apex-ops[data-theme="light"] .apex-atmosphere,
-.apex-ops[data-theme="light"] .apex-grain-layer,
-.apex-ops[data-theme="obsidian"] .apex-atmosphere,
-.apex-ops[data-theme="obsidian"] .apex-grain-layer,
-.apex-ops[data-theme="pizarra"] .apex-atmosphere {
+.apex-ops[data-theme="light"] .apex-grain-layer {
   display: none;
-}
-/* Pizarra keeps the grain (chalk-dust feel), screen-blended */
-.apex-ops[data-theme="pizarra"] .apex-grain-layer {
-  opacity: 0.08;
-  mix-blend-mode: screen;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1020,13 +931,7 @@ body:has(.apex-ops[data-theme="pizarra"]) {
   color: var(--apex-plat-hi);
 }
 
-/* Pizarra · each KPI value picks up a chalk-palette color by position. */
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(1) .apex-stat-num { color: #F4D35E; }
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(2) .apex-stat-num { color: #B4DD9C; }
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(3) .apex-stat-num { color: #8AC8E0; }
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(4) .apex-stat-num { color: #F4A6B8; }
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(5) .apex-stat-num { color: #F2A765; }
-.apex-ops[data-theme="pizarra"] .apex-kpi:nth-child(6) .apex-stat-num { color: #F2858A; }
+/* (Neon keeps KPI numbers white; per-position accent applied in components.) */
 
 @media (max-width: 1100px) {
   .apex-ops .apex-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1038,3 +943,243 @@ body:has(.apex-ops[data-theme="pizarra"]) {
   .apex-ops .apex-kpi:nth-child(2n) { border-right: 0 !important; }
   .apex-ops .apex-stat-num { font-size: 30px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 14 · NEON signature layer
+ *      Rounded corners + green accents + glow. Scoped 100% to [data-theme="neon"]
+ *      so Apex Dark / Apex Light render exactly as before.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Rounded surfaces (cards, modals, panels) */
+.apex-ops[data-theme="neon"] .apex-card,
+.apex-ops[data-theme="neon"] .apex-kpi-grid,
+.apex-ops[data-theme="neon"] .apex-modal,
+.apex-ops[data-theme="neon"] .apex-hover-panel,
+.apex-ops[data-theme="neon"] .cd-video-card,
+.apex-ops[data-theme="neon"] .cal-card { border-radius: var(--apex-radius); }
+/* Clip the top sheen to the rounded corners */
+.apex-ops[data-theme="neon"] .apex-card::before,
+.apex-ops[data-theme="neon"] .apex-kpi-grid::before { border-radius: var(--apex-radius) var(--apex-radius) 0 0; }
+
+/* Rounded controls (inputs, triggers, small buttons) */
+.apex-ops[data-theme="neon"] .ac-input,
+.apex-ops[data-theme="neon"] select.ac-input,
+.apex-ops[data-theme="neon"] textarea.ac-input,
+.apex-ops[data-theme="neon"] .apex-modal-input,
+.apex-ops[data-theme="neon"] .apex-crm-search-input,
+.apex-ops[data-theme="neon"] .apex-hover-trigger,
+.apex-ops[data-theme="neon"] .apex-mobile-burger,
+.apex-ops[data-theme="neon"] .apex-modal-close,
+.apex-ops[data-theme="neon"] .dw-close,
+.apex-ops[data-theme="neon"] .set-btn,
+.apex-ops[data-theme="neon"] .ac-btn,
+.apex-ops[data-theme="neon"] .apex-btn,
+.apex-ops[data-theme="neon"] .apex-modal-btn,
+.apex-ops[data-theme="neon"] .sales-mini,
+.apex-ops[data-theme="neon"] .live-outcome,
+.apex-ops[data-theme="neon"] .pl-move button,
+.apex-ops[data-theme="neon"] .sales-tbl .tbl-edit { border-radius: var(--apex-radius-sm); }
+
+/* Pills (badges, tags, segmented containers) */
+.apex-ops[data-theme="neon"] .badge,
+.apex-ops[data-theme="neon"] .sales-badge,
+.apex-ops[data-theme="neon"] .sales-origin,
+.apex-ops[data-theme="neon"] .lead-tag,
+.apex-ops[data-theme="neon"] .lead-stage,
+.apex-ops[data-theme="neon"] .set-vis,
+.apex-ops[data-theme="neon"] .mx-vis,
+.apex-ops[data-theme="neon"] .pf-metric-vis,
+.apex-ops[data-theme="neon"] .pf-link { border-radius: var(--apex-radius-pill); }
+.apex-ops[data-theme="neon"] .seg,
+.apex-ops[data-theme="neon"] .apex-crm-vs,
+.apex-ops[data-theme="neon"] .apex-crm-tasks-status { border-radius: var(--apex-radius-pill); overflow: hidden; }
+
+/* Rounded meters/bars */
+.apex-ops[data-theme="neon"] .set-meter,
+.apex-ops[data-theme="neon"] .set-meter-fill,
+.apex-ops[data-theme="neon"] .goal-bar,
+.apex-ops[data-theme="neon"] .goal-bar-fill,
+.apex-ops[data-theme="neon"] .rp-bar,
+.apex-ops[data-theme="neon"] .rp-bar-fill,
+.apex-ops[data-theme="neon"] .live-progress,
+.apex-ops[data-theme="neon"] .live-progress-fill { border-radius: var(--apex-radius-pill); }
+
+/* Segmented active = soft green fill + green text */
+.apex-ops[data-theme="neon"] .seg-btn[data-active] { color: var(--apex-accent); background: var(--apex-accent-soft); }
+
+/* Card hover glow (subtle green halo) */
+.apex-ops[data-theme="neon"] .apex-card:hover {
+  border-color: var(--apex-border-strong);
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    0 0 0 1px rgba(178, 242, 60, 0.10),
+    0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
+/* ── KPI signature — white number + green accent underline ── */
+.apex-ops[data-theme="neon"] .kpi-value::after,
+.apex-ops[data-theme="neon"] .mx-card-value::after,
+.apex-ops[data-theme="neon"] .fx-kpi-value::after {
+  content: ''; display: block; width: 26px; height: 2px; margin-top: 10px;
+  background: var(--apex-accent); border-radius: 2px;
+  box-shadow: 0 0 8px rgba(178, 242, 60, 0.45);
+}
+/* Separate metric cards get a hover glow + green accent border when public */
+.apex-ops[data-theme="neon"] .mx-card:hover {
+  border-color: var(--apex-border-strong);
+  box-shadow: var(--apex-glow);
+}
+.apex-ops[data-theme="neon"] .mx-card[data-public] {
+  border-color: color-mix(in srgb, var(--apex-accent) 45%, var(--apex-border));
+}
+
+/* ── Pipeline kanban (neon) — column panels + focus-column glow + card status dots ── */
+.apex-ops[data-theme="neon"] .pl-col {
+  box-sizing: border-box;
+  background: var(--apex-alpha-1);
+  border: 1px solid var(--apex-border-soft);
+  border-radius: var(--apex-radius);
+  padding: 12px 12px 14px;
+  transition: border-color 0.25s var(--apex-ease-editorial),
+              box-shadow 0.25s var(--apex-ease-editorial),
+              background 0.25s var(--apex-ease-editorial);
+}
+.apex-ops[data-theme="neon"] .pl-col:hover {
+  border-color: color-mix(in srgb, var(--apex-accent) 30%, var(--apex-border));
+}
+.apex-ops[data-theme="neon"] .pl-col-head { padding: 2px 4px 10px; }
+.apex-ops[data-theme="neon"] .pl-col-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 18px; padding: 0 6px;
+  background: var(--apex-alpha-3); border-radius: 999px;
+  color: var(--apex-plat-mid); font-size: 11px;
+}
+/* Focus column = the closer's hot stage (Llamada agendada) */
+.apex-ops[data-theme="neon"] .pl-col[data-focus] {
+  border-color: color-mix(in srgb, var(--apex-accent) 55%, transparent);
+  background: var(--apex-accent-soft);
+  box-shadow: var(--apex-glow);
+}
+.apex-ops[data-theme="neon"] .pl-col[data-focus] .pl-col-head > span:first-child { color: var(--apex-accent); }
+.apex-ops[data-theme="neon"] .pl-col[data-focus] .pl-col-count { background: var(--apex-accent); color: var(--apex-accent-ink); }
+
+/* Card status dot — derived from the lead's temperature tag */
+.apex-ops[data-theme="neon"] .pl-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle;
+}
+.apex-ops[data-theme="neon"] .pl-dot[data-temp="hot"]  { background: var(--apex-accent); box-shadow: 0 0 7px var(--apex-accent); }
+.apex-ops[data-theme="neon"] .pl-dot[data-temp="warm"] { background: #F2A765; }
+.apex-ops[data-theme="neon"] .pl-dot[data-temp="cold"] { background: #6FA0C8; }
+.apex-ops[data-theme="neon"] .pl-dot[data-temp="none"] { background: var(--apex-plat-shad); }
+
+/* ── Anillos de progreso (neon) — fila visible + arco con glow verde ── */
+.apex-ops[data-theme="neon"] .ring-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.apex-ops[data-theme="neon"] .ring-arc {
+  filter: drop-shadow(0 0 5px rgba(178, 242, 60, 0.55));
+}
+@media (max-width: 540px) {
+  .apex-ops[data-theme="neon"] .ring-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .apex-ops[data-theme="neon"] .ring-card { padding: 16px 8px; }
+}
+
+/* ── Notificaciones (neon) — glow de urgencia en no leídas ── */
+.apex-ops[data-theme="neon"] .apex-bell-panel { border-radius: var(--apex-radius); }
+.apex-ops[data-theme="neon"] .apex-bell-item[data-unread] {
+  background: var(--apex-accent-soft);
+  box-shadow: inset 3px 0 0 var(--apex-accent);
+}
+.apex-ops[data-theme="neon"] .apex-bell-item[data-unread] .apex-bell-title { color: var(--apex-accent); }
+.apex-ops[data-theme="neon"] .apex-bell-dot {
+  background: var(--apex-accent); color: var(--apex-accent-ink);
+  box-shadow: 0 0 8px rgba(178, 242, 60, 0.55);
+}
+
+/* ── Guion en vivo (neon) — paso activo verde + escenario redondeado + onda ── */
+.apex-ops[data-theme="neon"] .live-stage,
+.apex-ops[data-theme="neon"] .live-side,
+.apex-ops[data-theme="neon"] .live-result { border-radius: var(--apex-radius); }
+.apex-ops[data-theme="neon"] .live-rail-item { border-radius: var(--apex-radius-sm); }
+.apex-ops[data-theme="neon"] .live-rail-item[data-active] {
+  background: var(--apex-accent-soft);
+  border-color: color-mix(in srgb, var(--apex-accent) 55%, transparent);
+  color: var(--apex-accent);
+  box-shadow: var(--apex-glow);
+}
+.apex-ops[data-theme="neon"] .live-rail-item[data-active] .live-rail-n {
+  background: var(--apex-accent); color: var(--apex-accent-ink); border-color: var(--apex-accent);
+}
+.apex-ops[data-theme="neon"] .live-rail-item[data-done] .live-rail-n {
+  color: var(--apex-accent); border-color: color-mix(in srgb, var(--apex-accent) 45%, transparent);
+}
+.apex-ops[data-theme="neon"] .live-co-chip { border-radius: var(--apex-radius-pill); }
+
+/* Onda de audio animada (decorativa) */
+.apex-ops[data-theme="neon"] .live-wave {
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  height: 44px; margin-top: 20px;
+}
+.apex-ops[data-theme="neon"] .live-wave span {
+  width: 3px; height: 100%; border-radius: 2px;
+  background: var(--apex-accent);
+  box-shadow: 0 0 6px rgba(178, 242, 60, 0.5);
+  transform: scaleY(0.3); transform-origin: center;
+  animation: live-wave 1.1s var(--apex-ease-ambient) infinite;
+}
+@keyframes live-wave { 0%, 100% { transform: scaleY(0.22); opacity: 0.6; } 50% { transform: scaleY(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .apex-ops[data-theme="neon"] .live-wave span { animation: none; transform: scaleY(0.5); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 15 · NEON · floating rounded topbar · KPI cubes · green background
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Floating rounded header (the top nav becomes a detached rounded bar) */
+.apex-ops[data-theme="neon"] .apex-topbar,
+.apex-ops[data-theme="neon"] .apex-topbar[data-scrolled] {
+  background: transparent;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-bottom: 0;
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+}
+.apex-ops[data-theme="neon"] .apex-topbar-inner {
+  background: color-mix(in srgb, var(--apex-bg) 68%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid var(--apex-border);
+  border-radius: var(--apex-radius);
+  padding: 8px 18px;
+  box-shadow:
+    inset 0 1px 0 var(--apex-inset-top),
+    0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+/* Section header (FloatingHeader) — rounded to match */
+.apex-ops[data-theme="neon"] .apex-floating-header { border-radius: var(--apex-radius); }
+
+/* KPI strip → separate rounded cubes (not one big block) */
+.apex-ops[data-theme="neon"] .apex-card.kpi-strip {
+  background: transparent; border: 0; box-shadow: none; padding: 0;
+  border-radius: 0; gap: 12px;
+}
+.apex-ops[data-theme="neon"] .apex-card.kpi-strip::before { content: none; }
+.apex-ops[data-theme="neon"] .kpi {
+  background: var(--apex-card-bg);
+  border: 1px solid var(--apex-border);
+  border-radius: var(--apex-radius);
+  padding: 18px 20px;
+  box-shadow: inset 0 1px 0 var(--apex-inset-top);
+  transition: border-color 0.25s var(--apex-ease-editorial), box-shadow 0.25s var(--apex-ease-editorial);
+}
+.apex-ops[data-theme="neon"] .kpi:last-child { border-right: 1px solid var(--apex-border); }
+.apex-ops[data-theme="neon"] .kpi:hover { border-color: var(--apex-border-strong); box-shadow: var(--apex-glow); }
+
+/* FLAT background — no diffused glow at all. Just the bg color + crisp neon
+   accents (Alex: "no hay ningún verde difuminado, solo neon y el color de
+   fondo"). Hide the whole atmospheric canvas in neon. */
+.apex-ops[data-theme="neon"] .apex-atmosphere,
+.apex-ops[data-theme="neon"] .apex-grain-layer { display: none; }

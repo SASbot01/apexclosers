@@ -186,12 +186,14 @@ export default function Leads() {
         {view === 'kanban' ? (
           <div className="pl-board">
             {byStage.map(col => (
-              <div className="pl-col" key={col.key}>
+              <div className="pl-col" key={col.key} data-stage={col.key} data-focus={col.key === 'agendada' || undefined}>
                 <div className="pl-col-head"><span>{col.label}</span><span className="pl-col-count">{col.items.length}</span></div>
                 <div className="pl-col-body">
-                  {col.items.map(l => (
+                  {col.items.map(l => {
+                    const temp = (l.tags || []).includes('caliente') ? 'hot' : (l.tags || []).includes('templado') ? 'warm' : (l.tags || []).includes('frío') ? 'cold' : 'none'
+                    return (
                     <div className="apex-card pl-card" key={l.id} onClick={() => openLead(l.id)}>
-                      <div className="pl-card-top"><span className="pl-name">{l.name}</span><span className="pl-val">{money(l.value)}</span></div>
+                      <div className="pl-card-top"><span className="pl-name"><span className="pl-dot" data-temp={temp} />{l.name}</span><span className="pl-val">{money(l.value)}</span></div>
                       {l.company && <div className="pl-company">{l.company}</div>}
                       {(l.tags || []).length > 0 && <div className="lead-tags">{l.tags.map(t => <span className="lead-tag" key={t}>{t}</span>)}</div>}
                       {l.next_step && <div className="pl-next"><span className="pl-next-label">Seguimiento</span>{l.next_step}{l.next_at ? ` · ${fmtDay(l.next_at)}` : ''}</div>}
@@ -200,7 +202,8 @@ export default function Leads() {
                         <button disabled={STAGES.findIndex(s => s.key === l.stage) === STAGES.length - 1} onClick={() => move(l.id, 1)}>→</button>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   {col.items.length === 0 && <div className="pl-col-empty">—</div>}
                 </div>
               </div>

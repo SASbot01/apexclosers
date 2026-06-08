@@ -21,6 +21,22 @@ const RAW_CALLS = [
     offer_made: true,
     recording_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     next_step: 'Enviar propuesta y reagendar cierre para el jueves.',
+    score: 0.78,
+    objections: [
+      { label: 'Precio', note: 'Lo comparó con seguir gestionando en Excel.' },
+      { label: 'Tiempo', note: 'Dudas sobre la curva de implementación.' },
+    ],
+    dimensions: [
+      { label: 'Claridad', value: 0.86 },
+      { label: 'Manejo de objeciones', value: 0.62 },
+      { label: 'Propuesta de valor', value: 0.80 },
+      { label: 'Cierre', value: 0.58 },
+    ],
+    next_steps: [
+      'Enviar propuesta con el ROI de un solo cierre recuperado',
+      'Compartir caso de éxito (objeción “sigo en Excel”)',
+      'Reagendar la llamada de cierre para el jueves',
+    ],
     summary: `## Resumen
 Julián dirige una agencia de captación y factura ~25k/mes. Busca sistematizar su closing porque pierde seguimientos. Mostró interés alto pero frenó en el precio.
 
@@ -64,6 +80,21 @@ Para la próxima: ancla el valor con una cifra concreta antes de soltar el preci
     offer_made: true,
     recording_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
     next_step: 'Enviar contrato y link de pago de la segunda cuota.',
+    score: 0.91,
+    objections: [
+      { label: 'Confianza', note: 'Quería ver resultados reales de otra alumna antes de decidir.' },
+    ],
+    dimensions: [
+      { label: 'Claridad', value: 0.92 },
+      { label: 'Manejo de objeciones', value: 0.88 },
+      { label: 'Propuesta de valor', value: 0.90 },
+      { label: 'Cierre', value: 0.95 },
+    ],
+    next_steps: [
+      'Enviar contrato',
+      'Enviar link de pago de la 2ª cuota',
+      'Onboarding de bienvenida',
+    ],
     summary: `## Resumen
 María cerró en llamada. Pago inicial confirmado, resto en dos cuotas.
 

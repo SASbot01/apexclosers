@@ -4,7 +4,6 @@ import AuthGate from './shell/AuthGate'
 import AtmosphericCanvas from './shell/AtmosphericCanvas'
 import ApexOrb from './shell/ApexOrb'
 import ApexLayout from './shell/ApexLayout'
-import Home from './pages/home/Home'
 import Calls from './pages/calls/Calls'
 import CallDetail from './pages/call-detail/CallDetail'
 import Clients from './pages/clients/Clients'
@@ -20,6 +19,8 @@ import Settings from './pages/settings/Settings'
 import Profile from './pages/profile/Profile'
 import Sequences from './pages/sequences/Sequences'
 import Ranking from './pages/ranking/Ranking'
+import Workshop from './pages/workshop/Workshop'
+import CV from './pages/cv/CV'
 
 /*
  * Shell de la app (software sin nombre · marca = logo Apex).
@@ -30,9 +31,12 @@ import Ranking from './pages/ranking/Ranking'
 export default function App() {
   return (
     <ApexThemeProvider>
-      <AuthGate>
-        <Shell />
-      </AuthGate>
+      <Routes>
+        {/* Currículum web público (compartible) — fuera del AuthGate. */}
+        <Route path="/cv/:userId" element={<CV />} />
+        <Route path="/cv" element={<CV />} />
+        <Route path="/*" element={<AuthGate><Shell /></AuthGate>} />
+      </Routes>
     </ApexThemeProvider>
   )
 }
@@ -44,7 +48,8 @@ function Shell() {
       <AtmosphericCanvas />
       <Routes>
         <Route element={<ApexLayout />}>
-          <Route index element={<Home />} />
+          <Route index element={<Navigate to="/perfil" replace />} />
+          <Route path="workshop" element={<Workshop />} />
           <Route path="llamadas" element={<Calls />} />
           <Route path="llamadas/:id" element={<CallDetail />} />
           <Route path="clientes" element={<Clients />} />

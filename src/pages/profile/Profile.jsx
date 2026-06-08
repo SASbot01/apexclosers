@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { Heart, Trophy, ShieldCheck, Flame, Phone, ArrowLeft } from 'lucide-react'
 import FloatingHeader from '../../components/FloatingHeader'
+import ProgressRing from '../../components/ProgressRing'
+import AnimatedValue from '../../components/AnimatedValue'
+import StatusBadge from '../../components/StatusBadge'
+import { fmtDateTime } from '../../lib/format'
 import { getUserId } from '../../lib/config'
+import { getRanking } from '../../lib/workflowApi'
+import { CLIENTS, clientName } from '../../data/mock/clients'
 import {
   getProfile, getProfileById, updateProfile, uploadPhoto, searchProfiles, getCV, fileToDataUrl,
   listFriends, invite, respondInvite, removeFriend, listGroups, createGroup, deleteGroup, groupAdd, groupRemove,
+  listTeams, createTeam, deleteTeam, teamAdd, teamRemove,
 } from '../../lib/profileApi'
 import { openCV } from './cv'
 
@@ -17,20 +25,31 @@ const initials = (name) => (name || '?').split(' ').slice(0, 2).map(s => s[0]).j
 export default function Profile() {
   const { userId: routeUserId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const scopedClient = searchParams.get('client') || null   // perfil filtrado a un cliente (vía equipo)
   const targetId = routeUserId || getUserId()
-  const isOwn = targetId === getUserId()
+  const isOwn = targetId === getUserId() && !scopedClient
 
   const [data, setData] = useState(null)     // { profile, metrics, isOwner, friendship }
   const [state, setState] = useState('loading')
   const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState('amigos')
 
+  const [rank, setRank] = useState(null)
+
   const load = useCallback(() => {
     setState('loading')
-    const p = isOwn ? getProfile() : getProfileById(targetId)
+    const p = (routeUserId && routeUserId !== getUserId()) ? getProfileById(targetId, scopedClient) : getProfile(scopedClient)
     p.then(d => { setData(d); setState('live') }).catch(() => setState('error'))
-  }, [isOwn, targetId])
+  }, [routeUserId, targetId, scopedClient])
   useEffect(load, [load])
+
+  useEffect(() => {
+    if (scopedClient) { setRank(null); return }   // en vista filtrada no mostramos ranking global
+    getRanking('global')
+      .then(d => setRank((d.ranking || []).find(r => r.user_id === targetId) || (isOwn ? d.me : null) || null))
+      .catch(() => setRank(null))
+  }, [targetId, isOwn, scopedClient])
 
   if (state === 'loading') return <><FloatingHeader title="Perfil" eyebrow="PERFIL" /><section className="apex-section"><div className="apex-card" style={{ padding: 28, textAlign: 'center', color: 'var(--apex-plat-low)' }}>Cargando…</div></section></>
   if (state === 'error' || !data) return <><FloatingHeader title="Perfil" eyebrow="PERFIL" /><section className="apex-section"><div className="apex-card" style={{ padding: 28, color: 'var(--apex-plat-mid)' }}>No pude cargar el perfil (¿backend local arrancado?).</div></section></>
@@ -39,12 +58,16 @@ export default function Profile() {
 
   return (
     <>
-      <FloatingHeader title="Perfil" eyebrow="PERFIL" actions={
+      <FloatingHeader title="Perfil" eyebrow={scopedClient ? 'PERFIL · CLIENTE' : 'PERFIL'} actions={
         <div style={{ display: 'inline-flex', gap: 8 }}>
-          {!isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/perfil')}>← Mi perfil</button>}
-          {isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/ranking')}>Ranking</button>}
-          <button className="ac-btn" style={ghost} onClick={async () => { const cv = await getCV(targetId).catch(() => null); if (cv) openCV(cv); else alert('No pude generar el CV.') }}>Currículum</button>
-          {isOwn && !editing && <button className="ac-btn" onClick={() => setEditing(true)}>Editar perfil</button>}
+          {scopedClient
+            ? <button className="ac-btn" style={ghost} onClick={() => navigate(-1)}>← Volver al equipo</button>
+            : <>
+                {!isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/perfil')}>← Mi perfil</button>}
+                {isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/ranking')}>Ranking</button>}
+                <button className="ac-btn" style={ghost} onClick={() => navigate(`/cv/${targetId}`)}>Currículum</button>
+                {isOwn && !editing && <button className="ac-btn" onClick={() => setEditing(true)}>Editar perfil</button>}
+              </>}
         </div>
       } />
 
@@ -52,11 +75,28 @@ export default function Profile() {
         <EditProfile profile={profile} onDone={() => { setEditing(false); load() }} />
       ) : (
         <>
-          <ProfileHeader profile={profile} />
+          {scopedClient && (
+            <section className="apex-section">
+              <div className="apex-card pf-scope">
+                <span className="pf-scope-dot" />
+                <span className="pf-scope-txt">Acceso vía equipo · viendo <b>solo los datos de {clientName(scopedClient)}</b></span>
+                <button className="pf-scope-go" onClick={() => navigate(-1)}><ArrowLeft size={13} strokeWidth={2} /> Volver</button>
+              </div>
+            </section>
+          )}
+
+          <ProfileHeader profile={profile} targetId={targetId} metrics={metrics} rank={rank} scopedClient={scopedClient} onRanking={() => navigate('/ranking')} />
+
+          {/* Métricas — justo debajo del perfil, encima de amigos/grupos. */}
+          <MetricsSection metrics={metrics} isOwn={isOwn} scopedClient={scopedClient} onManage={() => navigate('/ajustes')} onEvolucion={() => navigate('/finanzas')} />
+
+          {scopedClient && data.activity && (
+            <ScopedActivity activity={data.activity} clientId={scopedClient} onOpenCall={(id) => navigate(`/llamadas/${id}`)} />
+          )}
 
           {isOwn && (!profile.nickname || !profile.bio || !profile.photo_url) && (
             <section className="apex-section">
-              <div className="apex-card" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderColor: 'color-mix(in srgb, #8AC8E0 40%, var(--apex-border))' }}>
+              <div className="apex-card" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderColor: 'color-mix(in srgb, var(--apex-accent, #8AC8E0) 40%, var(--apex-border))' }}>
                 <span style={{ fontSize: 13, color: 'var(--apex-plat-mid)' }}>
                   Completa tu perfil: {[!profile.photo_url && 'foto', !profile.nickname && 'nickname', !profile.bio && 'descripción'].filter(Boolean).join(' · ')} y añade tus enlaces.
                 </span>
@@ -69,18 +109,16 @@ export default function Profile() {
             <>
               <section className="apex-section">
                 <div className="seg" style={{ width: 'fit-content' }}>
-                  {[['amigos', 'Amigos e invitar'], ['grupos', 'Grupos']].map(([k, l]) => (
+                  {[['amigos', 'Amigos e invitar'], ['grupos', 'Grupos'], ['equipo', 'Equipo']].map(([k, l]) => (
                     <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
                   ))}
                 </div>
               </section>
               {tab === 'amigos' && <FriendsPanel onOpen={(id) => navigate(`/perfil/${id}`)} />}
               {tab === 'grupos' && <GroupsPanel />}
+              {tab === 'equipo' && <TeamsPanel onOpenMember={(id, cl) => navigate(`/perfil/${id}?client=${cl}`)} />}
             </>
           )}
-
-          {/* Métricas SIEMPRE abajo del todo del perfil. */}
-          <MetricsSection metrics={metrics} isOwn={isOwn} onManage={() => navigate('/ajustes')} onEvolucion={() => navigate('/finanzas')} />
         </>
       )}
       <style>{PF_CSS}</style>
@@ -90,22 +128,103 @@ export default function Profile() {
 
 const ghost = { background: 'transparent', color: 'var(--apex-plat-mid)', borderColor: 'var(--apex-border)' }
 
-function ProfileHeader({ profile }) {
+const LIKES_KEY = 'apex_closer_profile_likes'
+function LikeButton({ id }) {
+  const [liked, setLiked] = useState(() => { try { return !!(JSON.parse(localStorage.getItem(LIKES_KEY)) || {})[id] } catch { return false } })
+  const base = 128
+  const toggle = () => setLiked(v => {
+    const nv = !v
+    try { const o = JSON.parse(localStorage.getItem(LIKES_KEY)) || {}; o[id] = nv; localStorage.setItem(LIKES_KEY, JSON.stringify(o)) } catch { /* off */ }
+    return nv
+  })
+  return (
+    <button type="button" className="pf-like" data-on={liked || undefined} onClick={toggle} title="Me gusta">
+      <Heart size={14} strokeWidth={1.8} fill={liked ? 'currentColor' : 'none'} /> {base + (liked ? 1 : 0)}
+    </button>
+  )
+}
+
+function RankBanner({ rank, isOwn, onOpen }) {
+  if (!rank) return null
   return (
     <section className="apex-section">
-      <div className="apex-card pf-head">
-        <div className="pf-avatar">{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <span>{initials(profile.display_name || profile.nickname)}</span>}</div>
-        <div className="pf-id">
-          <h2 className="pf-name">{profile.display_name || profile.nickname || 'Sin nombre'}</h2>
-          {profile.nickname && <span className="pf-nick">@{profile.nickname}</span>}
-          {profile.headline && <div className="pf-headline">{profile.headline}</div>}
-          {profile.location && <div className="pf-loc">{profile.location}</div>}
-          {profile.bio && <p className="pf-bio">{profile.bio}</p>}
-          {(profile.links || []).length > 0 && (
-            <div className="pf-links">
-              {profile.links.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" className="pf-link">{l.label || l.url}</a>)}
+      <button type="button" className="apex-card pf-rank" onClick={onOpen}>
+        <span className="pf-rank-pos"><Trophy size={16} strokeWidth={1.8} /> #{rank.rank}</span>
+        <span className="pf-rank-txt">{isOwn ? 'Tu posición en el ranking global' : 'Posición en el ranking global'}</span>
+        <span className="pf-rank-meta">{money(rank.revenue)} · {intf(rank.deals)} cierres</span>
+        <span className="pf-rank-go">Ver ranking →</span>
+      </button>
+    </section>
+  )
+}
+
+function ProfileHeader({ profile, targetId, metrics = [], rank, onRanking, scopedClient }) {
+  const rev = metrics.find(m => m.key === 'revenue' && m.value != null)
+  const cash = metrics.find(m => m.key === 'cash_collected' && m.value != null)
+  const calls = metrics.find(m => m.key === 'calls')?.value || 0
+  const levelName = !rank ? 'Closer' : rank.rank <= 3 ? 'Leyenda' : rank.rank <= 10 ? 'Élite' : rank.rank <= 30 ? 'Pro' : 'Retador'
+  const nextName = !rank || rank.rank <= 3 ? null : rank.rank <= 10 ? 'Leyenda' : rank.rank <= 30 ? 'Élite' : 'Pro'
+  const levelPct = !rank ? 0.3 : rank.rank <= 3 ? 1 : Math.min(0.95, 0.5 + 2 / (rank.rank + 1))
+  const badges = [
+    { Icon: ShieldCheck, label: 'Verificado' },
+    ...(rank && rank.rank <= 10 ? [{ Icon: Trophy, label: 'Top 10' }] : []),
+    ...(calls >= 100 ? [{ Icon: Phone, label: '+100 llamadas' }] : []),
+    { Icon: Flame, label: 'En racha' },
+  ]
+  return (
+    <section className="apex-section">
+      <div className="pf-top">
+        <div className="pf-avatar-xl">{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <span>{initials(profile.display_name || profile.nickname)}</span>}</div>
+
+        <div className="apex-card pf-id-card">
+          <LikeButton id={targetId} />
+          <div className="pf-id-grid">
+            <div className="pf-col-main">
+              <h2 className="pf-name">{profile.display_name || profile.nickname || 'Sin nombre'}</h2>
+              {profile.nickname && <span className="pf-nick">@{profile.nickname}</span>}
+              {profile.headline && <div className="pf-headline">{profile.headline}</div>}
+              {profile.location && <div className="pf-loc">{profile.location}</div>}
+              <div className="pf-clients">
+                <span className="pf-clients-lbl">Cerrando para</span>
+                <span className="pf-clients-list">{(scopedClient ? CLIENTS.filter(c => c.id === scopedClient) : CLIENTS).map(c => <span className="pf-client-chip" key={c.id} data-active={scopedClient === c.id || undefined}>{c.name}</span>)}</span>
+              </div>
+              {profile.bio && <p className="pf-bio">{profile.bio}</p>}
+              <div className="pf-merits">
+                {!scopedClient && (
+                  <div className="pf-merit">
+                    <span className="pf-side-lbl">Nivel · <b className="pf-merit-name">Closer {levelName}</b></span>
+                    <div className="pf-level-bar"><div className="pf-level-fill" style={{ width: `${Math.round(levelPct * 100)}%` }} /></div>
+                    <span className="pf-side-hint">{nextName ? `En camino a ${nextName}` : 'Nivel máximo alcanzado'}</span>
+                  </div>
+                )}
+                <div className="pf-badges-list">
+                  {badges.map((b, i) => <span className="pf-badge" key={i}><b.Icon size={12} strokeWidth={1.8} /> {b.label}</span>)}
+                </div>
+              </div>
+              {(profile.links || []).length > 0 && (
+                <div className="pf-links">
+                  {profile.links.map((l, i) => <a key={i} href={l.url} target="_blank" rel="noreferrer" className="pf-link">{l.label || l.url}</a>)}
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="pf-col-side">
+              {(rev || cash) && (
+                <div className="pf-altar">
+                  {cash && <div className="pf-altar-hero"><span className="pf-altar-v"><AnimatedValue value={cash.value * 0.15} fmt="money" /></span><span className="pf-altar-l">Tu comisión</span></div>}
+                  {cash && <div className="pf-altar-line"><span className="pf-altar-v2"><AnimatedValue value={cash.value} fmt="money" /></span><span className="pf-altar-l">Cash collected</span></div>}
+                  {rev && <div className="pf-altar-line"><span className="pf-altar-v2"><AnimatedValue value={rev.value} fmt="money" /></span><span className="pf-altar-l">Revenue</span></div>}
+                </div>
+              )}
+              {rank && (
+                <button type="button" className="pf-rankrow" onClick={onRanking}>
+                  <span className="pf-rankrow-pos"><Trophy size={15} strokeWidth={1.8} /> #{rank.rank}</span>
+                  <span className="pf-rankrow-lbl">Ranking global</span>
+                  <span className="pf-rankrow-go">Ver →</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -115,12 +234,37 @@ function ProfileHeader({ profile }) {
 // Sección de métricas, abajo del todo del perfil. El dueño las ve TODAS (con su
 // etiqueta pública/privada); un visitante (amigo/grupo/invitado) ve solo las
 // públicas. Quién es público/privado se gestiona en Ajustes.
-function MetricsSection({ metrics, isOwn, onManage, onEvolucion }) {
-  const items = (metrics || []).filter(m => m.value != null)
+function MetricsSection({ metrics, isOwn, onManage, onEvolucion, scopedClient }) {
+  // Revenue/Cash/Comisión van arriba (cabecera). Aquí: embudo en 2 filas.
+  const byKey = Object.fromEntries((metrics || []).map(m => [m.key, m]))
+  const v = (k) => byKey[k]?.value ?? 0
+  const pub = (k) => !!byKey[k]?.public
+  const ratio = (n, d) => (d ? n / d : 0)
+  const calls = v('calls'), held = v('held'), offers = v('offers'), deals = v('deals'), deposits = v('deposits')
+  const hasData = calls || held || offers || deals
+
+  // Fila 1 — conteos del embudo.
+  const counts = [
+    { key: 'calls', label: 'Llamadas', value: calls, public: pub('calls') },
+    { key: 'held', label: 'Realizadas', value: held, public: pub('held') },
+    { key: 'offers', label: 'Ofertas', value: offers, public: pub('offers') },
+    { key: 'deposits', label: 'Depósitos', value: deposits, public: pub('deposits') },
+    { key: 'deals', label: 'Cierres', value: deals, public: pub('deals') },
+  ]
+  // Fila 2 — porcentajes (todos sobre Realizadas salvo el Show, que es sobre el total).
+  const rates = [
+    { key: 'show', label: '% Show', value: ratio(held, calls), public: pub('show_rate') },
+    { key: 'offer', label: '% Oferta', value: ratio(offers, held), public: pub('offers') },
+    { key: 'offerclose', label: '% Oferta/Cierre', value: ratio(deals, offers), public: true },
+    { key: 'commitment', label: '% Commitment', value: ratio(deposits + deals, held), public: true },
+    { key: 'close', label: '% Cierre', value: ratio(deals, held), public: pub('close_rate') },
+  ]
+  const Pill = ({ on }) => isOwn ? <span className="pf-metric-vis" data-on={on || undefined}>{on ? 'Pública' : 'Privada'}</span> : null
+
   return (
     <section className="apex-section">
       <div className="home-head" style={{ alignItems: 'baseline' }}>
-        <h3 style={{ margin: 0, fontWeight: 400 }}>Métricas</h3>
+        <h3 style={{ margin: 0, fontWeight: 400 }}>Métricas{scopedClient ? <span style={{ color: 'var(--apex-accent, var(--apex-plat-mid))', fontSize: 13 }}> · {clientName(scopedClient)}</span> : ''}</h3>
         {isOwn && (
           <span style={{ display: 'inline-flex', gap: 14 }}>
             <button className="crm-link" onClick={onEvolucion}>Evolución →</button>
@@ -129,21 +273,34 @@ function MetricsSection({ metrics, isOwn, onManage, onEvolucion }) {
         )}
       </div>
       <p className="set-note" style={{ margin: '0 0 6px' }}>
-        {isOwn
-          ? 'Las ves todas. Las marcadas como Pública las pueden ver tus amigos, grupos y la gente que invites; las Privadas, no.'
-          : 'Métricas públicas de este perfil.'}
+        {scopedClient
+          ? `Embudo completo de este closer en ${clientName(scopedClient)}.`
+          : isOwn
+            ? 'Las ves todas. Las marcadas como Pública las pueden ver tus amigos, grupos y la gente que invites; las Privadas, no.'
+            : 'Métricas públicas de este perfil.'}
       </p>
-      {items.length === 0
+      {!hasData
         ? <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>{isOwn ? 'Aún no tienes métricas. Cierra y verifica ventas para que aparezcan.' : 'Este perfil no tiene métricas públicas.'}</div>
         : (
-          <div className="pf-metrics">
-            {items.map(m => (
-              <div className="apex-card pf-metric" key={m.key} data-public={m.public || undefined}>
-                <span className="pf-metric-v">{fmtVal(m)}</span>
-                <span className="pf-metric-l">{m.label}</span>
-                {isOwn && <span className="pf-metric-vis" data-on={m.public || undefined}>{m.public ? 'Pública' : 'Privada'}</span>}
-              </div>
-            ))}
+          <div className="pf-metrics-rows">
+            <div className="pf-metrics-row">
+              {counts.map(m => (
+                <div className="pf-metric" key={m.key} data-public={m.public || undefined}>
+                  <span className="pf-metric-v"><AnimatedValue value={m.value} fmt="int" /></span>
+                  <span className="pf-metric-l">{m.label}</span>
+                  <Pill on={m.public} />
+                </div>
+              ))}
+            </div>
+            <div className="pf-metrics-row">
+              {rates.map(m => (
+                <div className="pf-metric pf-metric--ring" key={m.key} data-public={m.public || undefined}>
+                  <ProgressRing value={m.value} size={94} stroke={8} card={false} />
+                  <span className="pf-metric-l">{m.label}</span>
+                  <Pill on={m.public} />
+                </div>
+              ))}
+            </div>
           </div>
         )}
     </section>
@@ -357,12 +514,204 @@ function GroupsPanel() {
 
 const FriendAvatar = ({ p }) => <div className="pf-friend-av">{p.photo_url ? <img src={p.photo_url} alt="" /> : <span>{initials(p.display_name || p.nickname)}</span>}</div>
 
+// Actividad del closer FILTRADA al cliente (vía equipo): sus llamadas (clicables
+// → detalle) y sus ventas verificadas en esa cuenta. Solo aparece en modo scoped.
+function ScopedActivity({ activity, clientId, onOpenCall }) {
+  const calls = activity.calls || []
+  const sales = activity.sales || []
+  return (
+    <section className="apex-section">
+      <div className="pf-act-grid">
+        <div className="apex-card pf-act">
+          <div className="pf-act-head">
+            <h3>Llamadas en {clientName(clientId)}</h3>
+            <Link className="crm-link pf-act-all" to={`/llamadas?client=${clientId}`}>Ver todas →</Link>
+          </div>
+          {calls.length === 0 && <p className="ac-empty" style={{ padding: 0 }}>Sin llamadas registradas en esta cuenta.</p>}
+          <div className="pf-act-list">
+            {calls.map(c => (
+              <button type="button" className="pf-act-row pf-act-call" key={c.id} onClick={() => onOpenCall(c.id)} title="Ver detalle de la llamada">
+                <div className="pf-act-row-main">
+                  <span className="pf-act-row-title">{c.title || 'Llamada sin título'}</span>
+                  <span className="pf-act-row-meta">{fmtDateTime(c.started_at || c.scheduled_at)}{c.has_transcript ? ' · con transcripción' : ''}</span>
+                </div>
+                <StatusBadge call={c} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="apex-card pf-act">
+          <div className="pf-act-head">
+            <h3>Ventas en {clientName(clientId)}</h3>
+            <Link className="crm-link pf-act-all" to={`/clientes?client=${clientId}`}>Ver todas →</Link>
+          </div>
+          {sales.length === 0 && <p className="ac-empty" style={{ padding: 0 }}>Sin ventas verificadas en esta cuenta.</p>}
+          <div className="pf-act-list">
+            {sales.map(s => (
+              <div className="pf-act-row" key={s.id}>
+                <div className="pf-act-row-main">
+                  <span className="pf-act-row-title">{s.product}</span>
+                  <span className="pf-act-row-meta">{fmtDateTime(s.date)} · {s.payment_method} · {s.payment_type}</span>
+                </div>
+                <div className="pf-act-sale-amt">
+                  <span className="pf-act-rev">{money(s.revenue)}</span>
+                  {s.cash_collected !== s.revenue && <span className="pf-act-cash">cobrado {money(s.cash_collected)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{PF_CSS}</style>
+    </section>
+  )
+}
+
+// Equipos de cliente: cada equipo trabaja UNA cuenta; sus datos se ven filtrados a
+// ese cliente (revenue/cierres/llamadas del equipo en esa cuenta + aporte de cada
+// miembro). Crear equipo = nombre + emoji + cliente; luego se añaden closers amigos.
+function TeamsPanel({ onOpenMember }) {
+  const [teams, setTeams] = useState([])
+  const [friends, setFriends] = useState([])
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('🎯')
+  const [clientId, setClientId] = useState(CLIENTS[0]?.id || '')
+  const load = () => { listTeams().then(setTeams).catch(() => {}); listFriends().then(d => setFriends(d.friends)).catch(() => {}) }
+  useEffect(() => { load() }, [])
+
+  const add = async () => { if (!name.trim() || !clientId) return; await createTeam(name, emoji, clientId).catch(() => {}); setName(''); load() }
+
+  return (
+    <section className="apex-section">
+      <div className="apex-card" style={{ padding: 20, marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Montar equipo de cliente</h3>
+        <p className="set-note" style={{ margin: '0 0 12px' }}>Un equipo agrupa a los closers que trabajan <b>una misma cuenta</b>. Sus métricas se ven <b>filtradas solo a ese cliente</b>.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input className="ac-input" style={{ width: 60, textAlign: 'center' }} value={emoji} onChange={e => setEmoji(e.target.value.slice(0, 2))} />
+          <input className="ac-input" style={{ maxWidth: 240 }} placeholder="Nombre del equipo (ej. Escuadrón Hugo)" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+          <select className="ac-input" style={{ maxWidth: 220 }} value={clientId} onChange={e => setClientId(e.target.value)}>
+            {CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button className="ac-btn" onClick={add}>Crear equipo</button>
+        </div>
+      </div>
+
+      {teams.length === 0 && <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>Sin equipos todavía. Crea uno y asígnalo a un cliente.</div>}
+      {teams.map(t => (
+        <div className="apex-card pf-team" key={t.id} style={{ padding: 20, marginBottom: 12 }}>
+          <div className="pf-team-head">
+            <div className="pf-team-title">
+              <span className="pf-team-emoji">{t.emoji}</span>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 400 }}>{t.name} <span style={{ color: 'var(--apex-plat-low)', fontSize: 12 }}>· {t.members.length} closers</span></h3>
+                <span className="pf-team-client">{clientName(t.client_id)}</span>
+              </div>
+            </div>
+            <button className="sales-mini sales-mini--del" onClick={() => deleteTeam(t.id).then(load)}>Eliminar equipo</button>
+          </div>
+
+          {/* Marcador del equipo — datos filtrados a este cliente */}
+          <div className="pf-team-scoreboard">
+            {[
+              { l: 'Revenue', v: money(t.totals.revenue) },
+              { l: 'Cash collected', v: money(t.totals.cash) },
+              { l: 'Cierres', v: intf(t.totals.deals) },
+              { l: 'Llamadas', v: intf(t.totals.calls) },
+              { l: 'Close rate', v: pct(t.totals.close_rate) },
+            ].map(s => (
+              <div className="pf-team-stat" key={s.l}><span className="pf-team-stat-v">{s.v}</span><span className="pf-team-stat-l">{s.l}</span></div>
+            ))}
+          </div>
+
+          <div className="pf-team-members">
+            {t.members.map(m => (
+              <div className="pf-team-member" key={m.user_id}>
+                <FriendAvatar p={m} />
+                <div className="pf-friend-id" style={{ cursor: 'pointer' }} onClick={() => onOpenMember(m.user_id, t.client_id)} title={`Ver a ${m.display_name} solo en ${clientName(t.client_id)}`}>
+                  <span className="pf-friend-name">{m.display_name}</span>
+                  {m.nickname && <span className="pf-friend-nick">@{m.nickname}</span>}
+                </div>
+                <span className="pf-team-mstat">{money(m.stats.revenue)} · {intf(m.stats.deals)} cierres</span>
+                <button className="sales-mini sales-mini--go" onClick={() => onOpenMember(m.user_id, t.client_id)} title="Abrir perfil filtrado a este cliente">Ver →</button>
+                <button className="sales-mini sales-mini--del" onClick={() => teamRemove(t.id, m.user_id).then(load)}>✕</button>
+              </div>
+            ))}
+            {t.members.length === 0 && <p className="ac-empty" style={{ padding: 0 }}>Equipo vacío. Añade closers abajo.</p>}
+          </div>
+
+          {friends.filter(f => !t.members.some(m => m.user_id === f.user_id)).length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <label className="sc-lbl">Añadir closer al equipo</label>
+              <select className="ac-input" style={{ maxWidth: 280 }} value="" onChange={e => e.target.value && teamAdd(t.id, e.target.value).then(load)}>
+                <option value="">— elige —</option>
+                {friends.filter(f => !t.members.some(m => m.user_id === f.user_id)).map(f => <option key={f.user_id} value={f.user_id}>{f.display_name}{f.nickname ? ` (@${f.nickname})` : ''}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      ))}
+      <style>{PF_CSS}</style>
+    </section>
+  )
+}
+
 const PF_CSS = `
-.pf-head { padding: 24px; display: flex; gap: 20px; align-items: flex-start; }
+/* Avatar pequeño (pantalla de edición) */
 .pf-avatar { width: 88px; height: 88px; flex: 0 0 88px; border-radius: 50%; overflow: hidden; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); display: inline-flex; align-items: center; justify-content: center; color: var(--apex-plat-mid); font-size: 28px; }
 .pf-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.pf-id { min-width: 0; }
-.pf-name { margin: 0; font-weight: 400; font-size: 22px; color: var(--apex-plat-hi); }
+
+/* Cabecera: columna lateral (foto grande + ranking + nivel + logros) | tarjeta info */
+.pf-top { display: flex; align-items: center; gap: 28px; }
+.pf-avatar-xl { width: 200px; height: 200px; flex: none; border-radius: 50%; overflow: hidden; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border-strong); display: inline-flex; align-items: center; justify-content: center; color: var(--apex-plat-mid); font-size: 58px; box-shadow: 0 10px 28px rgba(0,0,0,0.4); }
+.pf-avatar-xl img { width: 100%; height: 100%; object-fit: cover; }
+.pf-id-card { flex: 1; min-width: 0; padding: 26px; position: relative; }
+.pf-id-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 30px; align-items: start; }
+.pf-col-main { min-width: 0; display: flex; flex-direction: column; }
+.pf-col-side { display: flex; flex-direction: column; gap: 18px; }
+.pf-merits { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.pf-merit { display: flex; flex-direction: column; gap: 6px; max-width: 360px; }
+.pf-merit-name { color: var(--apex-plat-hi); font-weight: 500; }
+.pf-rankrow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); border-radius: var(--apex-radius, 0); cursor: pointer; transition: border-color 0.18s; }
+.pf-rankrow:hover { border-color: var(--apex-border-strong); }
+.pf-rankrow-pos { display: inline-flex; align-items: center; gap: 6px; font-size: 18px; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; }
+.pf-rankrow-lbl { font-size: 12px; color: var(--apex-plat-mid); }
+.pf-rankrow-go { margin-left: auto; font-size: 12px; color: var(--apex-plat-low); }
+
+/* Widgets de la columna lateral */
+.pf-side-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--apex-plat-low); }
+.pf-side-hint { font-size: 11px; color: var(--apex-plat-low); }
+.pf-rankcard { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.pf-rankcard-pos { font-size: 42px; line-height: 1; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; }
+.pf-rankcard-sub { font-size: 12px; color: var(--apex-plat-mid); }
+.pf-rankcard-go { align-self: flex-start; margin-top: 4px; }
+.pf-level { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.pf-level-name { font-size: 16px; color: var(--apex-plat-hi); }
+.pf-level-bar { height: 6px; background: var(--apex-alpha-2); border-radius: 999px; overflow: hidden; }
+.pf-level-fill { height: 100%; background: var(--apex-accent, var(--apex-plat-hi)); border-radius: 999px; box-shadow: 0 0 10px color-mix(in srgb, var(--apex-accent, transparent) 40%, transparent); }
+.pf-badges { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.pf-badges-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--apex-plat-mid); border: 1px solid var(--apex-border); padding: 4px 8px; border-radius: var(--apex-radius-pill, 0); }
+.pf-badge svg { color: var(--apex-accent, var(--apex-plat-mid)); }
+.pf-id-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pf-id-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pf-clients { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.pf-clients-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--apex-plat-low); }
+.pf-clients-list { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.pf-client-chip { font-size: 11.5px; color: var(--apex-plat-mid); border: 1px solid var(--apex-border); padding: 3px 9px; border-radius: var(--apex-radius-pill, 0); }
+.pf-like { position: absolute; top: 18px; right: 18px; z-index: 1; display: inline-flex; align-items: center; gap: 6px; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); color: var(--apex-plat-mid); font-family: var(--apex-font); font-size: 12.5px; padding: 6px 12px; border-radius: var(--apex-radius-pill, 0); cursor: pointer; transition: color 0.18s, border-color 0.18s; }
+.pf-like:hover { color: var(--apex-plat-hi); border-color: var(--apex-plat-mid); }
+.pf-like[data-on] { color: var(--apex-status-neg); border-color: color-mix(in srgb, var(--apex-status-neg) 45%, transparent); }
+
+/* Banner de posición en el ranking */
+.pf-rank { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px 18px; cursor: pointer; flex-wrap: wrap; }
+.pf-rank-pos { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; }
+.pf-rank-txt { font-size: 13px; color: var(--apex-plat-mid); }
+.pf-rank-meta { font-size: 13px; color: var(--apex-plat-hi); }
+.pf-rank-go { margin-left: auto; font-size: 12px; color: var(--apex-plat-low); }
+.pf-rank:hover .pf-rank-go { color: var(--apex-plat-hi); }
+
+.pf-name { margin: 0; font-weight: 400; font-size: 24px; color: var(--apex-plat-hi); }
 .pf-nick { font-size: 13px; color: var(--apex-plat-low); }
 .pf-headline { font-size: 14px; color: var(--apex-plat-mid); margin-top: 6px; }
 .pf-loc { font-size: 12px; color: var(--apex-plat-low); margin-top: 2px; }
@@ -370,19 +719,90 @@ const PF_CSS = `
 .pf-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .pf-link { font-size: 12px; color: var(--apex-plat-hi); border: 1px solid var(--apex-border); padding: 4px 10px; text-decoration: none; }
 .pf-link:hover { border-color: var(--apex-plat-mid); }
-.pf-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-.pf-metric { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-.pf-metric[data-public] { border-color: color-mix(in srgb, #6FCF9C 40%, var(--apex-border)); }
-.pf-metric-v { font-size: 22px; color: var(--apex-plat-hi); }
-.pf-metric-l { font-size: 11.5px; color: var(--apex-plat-low); text-transform: uppercase; letter-spacing: 0.06em; }
-.pf-metric-vis { margin-top: 6px; align-self: flex-start; font-size: 10px; padding: 2px 7px; border: 1px solid var(--apex-border); color: var(--apex-plat-low); border-radius: 2px; }
-.pf-metric-vis[data-on] { color: #6FCF9C; border-color: color-mix(in srgb, #6FCF9C 45%, transparent); }
+.pf-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+.pf-metric { position: relative; padding: 18px; display: flex; flex-direction: column; gap: 6px; background: var(--apex-card-bg); border: 1px solid var(--apex-border); border-radius: var(--apex-radius, 0); box-shadow: inset 0 1px 0 var(--apex-inset-top); }
+.pf-metric[data-public]::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--apex-accent, var(--apex-status-pos)); }
+.pf-metric-v { font-size: 26px; color: var(--apex-plat-hi); font-variant-numeric: tabular-nums; line-height: 1; }
+.pf-metric-l { font-size: 11px; color: var(--apex-plat-low); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-metric-vis { position: absolute; top: 12px; right: 12px; font-size: 9px; padding: 2px 7px; border: 1px solid var(--apex-border); color: var(--apex-plat-low); border-radius: var(--apex-radius-pill, 2px); }
+.pf-metric-vis[data-on] { color: var(--apex-accent, var(--apex-status-pos)); border-color: color-mix(in srgb, var(--apex-accent, var(--apex-status-pos)) 45%, transparent); }
+
+/* Descripción + Revenue/Cash destacados en la misma fila */
+.pf-about { display: flex; gap: 26px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.pf-about .pf-bio { flex: 1; min-width: 240px; margin: 0; }
+/* Altar: Tu comisión (grande, verde) → Cash collected → Revenue (apilados, sin borde) */
+.pf-altar { flex: 0 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.pf-altar-hero { display: flex; flex-direction: column; gap: 4px; }
+.pf-altar-v { font-size: 38px; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; line-height: 1; }
+.pf-altar-line { display: flex; flex-direction: column; gap: 3px; }
+.pf-altar-v2 { font-size: 22px; color: var(--apex-plat-mid); font-variant-numeric: tabular-nums; line-height: 1; }
+.pf-altar-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--apex-plat-low); }
+
+/* Métricas en 2 filas de 5: conteos arriba, porcentajes (marcador/anillo) abajo */
+.pf-metrics-rows { display: flex; flex-direction: column; gap: 12px; }
+.pf-metrics-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.pf-metric { min-height: 132px; justify-content: center; }
+.pf-metric--ring { align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 14px; }
+.pf-metric--ring .ring-card { padding: 0; gap: 8px; }
+@media (max-width: 900px) { .pf-metrics-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .pf-metrics-row { grid-template-columns: repeat(2, 1fr); } }
+
+@media (max-width: 980px) { .pf-id-grid { grid-template-columns: 1fr; gap: 20px; } }
+@media (max-width: 720px) {
+  .pf-top { flex-direction: column; align-items: stretch; }
+  .pf-avatar-xl { width: 160px; height: 160px; align-self: center; }
+}
+@media (max-width: 560px) { .pf-id-card { padding: 20px 18px; } }
 .pf-friend-list { display: flex; flex-direction: column; gap: 8px; }
-.pf-friend { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--apex-border); background: var(--apex-card-bg, rgba(255,255,255,0.02)); }
-.pf-friend-av { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; overflow: hidden; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); display: inline-flex; align-items: center; justify-content: center; color: var(--apex-plat-mid); font-size: 13px; }
+.pf-friend { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--apex-border); background: var(--apex-trigger-bg); border-radius: var(--apex-radius-sm, 0); transition: border-color 0.18s var(--apex-ease-editorial), background 0.18s var(--apex-ease-editorial); }
+.pf-friend:hover { border-color: var(--apex-border-strong); background: var(--apex-trigger-bg-h); }
+.pf-friend-av { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; overflow: hidden; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); display: inline-flex; align-items: center; justify-content: center; color: var(--apex-plat-mid); font-size: 14px; }
 .pf-friend-av img { width: 100%; height: 100%; object-fit: cover; }
 .pf-friend-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pf-friend-name { font-size: 13px; color: var(--apex-plat-hi); cursor: pointer; }
 .pf-friend-name:hover { text-decoration: underline; }
 .pf-friend-nick { font-size: 11px; color: var(--apex-plat-low); }
+
+/* Banner de perfil filtrado a un cliente (acceso vía equipo) */
+.pf-scope { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-color: color-mix(in srgb, var(--apex-accent, var(--apex-border-strong)) 45%, var(--apex-border)); background: color-mix(in srgb, var(--apex-accent, transparent) 7%, var(--apex-card-bg, var(--apex-trigger-bg))); }
+.pf-scope-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--apex-accent, var(--apex-plat-hi)); box-shadow: 0 0 10px color-mix(in srgb, var(--apex-accent, transparent) 70%, transparent); }
+.pf-scope-txt { flex: 1; min-width: 0; font-size: 13px; color: var(--apex-plat-mid); }
+.pf-scope-txt b { color: var(--apex-plat-hi); font-weight: 500; }
+.pf-scope-go { display: inline-flex; align-items: center; gap: 5px; background: transparent; border: 1px solid var(--apex-border); color: var(--apex-plat-mid); padding: 6px 12px; border-radius: var(--apex-radius-pill, 999px); font-size: 12px; cursor: pointer; transition: border-color 0.18s, color 0.18s; }
+.pf-scope-go:hover { border-color: var(--apex-accent, var(--apex-border-strong)); color: var(--apex-plat-hi); }
+.pf-client-chip[data-active] { border-color: color-mix(in srgb, var(--apex-accent, var(--apex-border-strong)) 55%, transparent); color: var(--apex-accent, var(--apex-plat-hi)); }
+
+/* Actividad filtrada al cliente (llamadas + ventas del closer en esa cuenta) */
+.pf-act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pf-act { padding: 20px; }
+.pf-act-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.pf-act-head h3 { margin: 0; font-weight: 400; font-size: 15px; }
+.pf-act-count { font-size: 12px; color: var(--apex-plat-low); font-variant-numeric: tabular-nums; border: 1px solid var(--apex-border); border-radius: var(--apex-radius-pill, 999px); padding: 1px 9px; }
+.pf-act-list { display: flex; flex-direction: column; gap: 8px; }
+.pf-act-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 13px; border: 1px solid var(--apex-border); background: var(--apex-trigger-bg); border-radius: var(--apex-radius-sm, 10px); }
+button.pf-act-row { cursor: pointer; transition: border-color 0.18s var(--apex-ease-editorial), background 0.18s var(--apex-ease-editorial); font: inherit; color: inherit; }
+button.pf-act-row:hover { border-color: var(--apex-accent, var(--apex-border-strong)); background: var(--apex-trigger-bg-h); }
+.pf-act-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pf-act-row-title { font-size: 13px; color: var(--apex-plat-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-act-row-meta { font-size: 11px; color: var(--apex-plat-low); }
+.pf-act-sale-amt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.pf-act-rev { font-size: 14px; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; }
+.pf-act-cash { font-size: 10px; color: var(--apex-plat-low); }
+@media (max-width: 860px) { .pf-act-grid { grid-template-columns: 1fr; } }
+
+/* Equipos de cliente */
+.pf-team-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.pf-team-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pf-team-emoji { font-size: 26px; line-height: 1; width: 46px; height: 46px; flex: 0 0 46px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--apex-radius-sm, 10px); background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); }
+.pf-team-client { display: inline-flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--apex-accent, var(--apex-plat-mid)); }
+.pf-team-client::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--apex-accent, var(--apex-plat-mid)); box-shadow: 0 0 8px color-mix(in srgb, var(--apex-accent, transparent) 60%, transparent); }
+.pf-team-scoreboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--apex-border); border: 1px solid var(--apex-border); border-radius: var(--apex-radius-sm, 10px); overflow: hidden; margin-bottom: 16px; }
+.pf-team-stat { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; background: var(--apex-trigger-bg); }
+.pf-team-stat-v { font-size: 19px; color: var(--apex-accent, var(--apex-plat-hi)); font-variant-numeric: tabular-nums; line-height: 1.05; }
+.pf-team-stat-l { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--apex-plat-low); }
+.pf-team-members { display: flex; flex-direction: column; gap: 8px; }
+.pf-team-member { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--apex-border); background: var(--apex-trigger-bg); border-radius: var(--apex-radius-sm, 0); transition: border-color 0.18s var(--apex-ease-editorial); }
+.pf-team-member:hover { border-color: var(--apex-border-strong); }
+.pf-team-mstat { font-size: 12px; color: var(--apex-plat-mid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 720px) { .pf-team-scoreboard { grid-template-columns: repeat(2, 1fr); } .pf-team-mstat { display: none; } }
 `

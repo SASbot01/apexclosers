@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
 import FilterBar, { SelectFilter } from '../../components/Filters'
+import ClientLock from '../../components/ClientLock'
 import SegTabs from '../../components/SegTabs'
 import StatusBadge from '../../components/StatusBadge'
 import { useCalls } from '../../data/hooks/useCalls'
@@ -23,8 +24,11 @@ export default function Calls() {
   const [msg, setMsg] = useState(null)
   const [client, setClient] = useState('all')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const lockedClient = searchParams.get('client') || null   // vista bloqueada a una cuenta (vía equipo)
+  const effClient = lockedClient || client
 
-  const visible = calls.filter(c => client === 'all' || c.client_id === client)
+  const visible = calls.filter(c => effClient === 'all' || c.client_id === effClient)
 
   async function start(e) {
     e.preventDefault()
@@ -54,7 +58,9 @@ export default function Calls() {
           <>
             <SegTabs tabs={CALLS_TABS} />
             <FilterBar>
-              <SelectFilter label="Cliente" value={client} options={CLIENT_OPTIONS} onChange={setClient} />
+              {lockedClient
+                ? <ClientLock clientId={lockedClient} />
+                : <SelectFilter label="Cliente" value={client} options={CLIENT_OPTIONS} onChange={setClient} />}
               <span className="ac-source" data-source={source}>{sourceLabel}</span>
             </FilterBar>
           </>}

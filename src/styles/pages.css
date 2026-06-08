@@ -19,6 +19,12 @@
 .badge[data-tone="live"] .badge-dot { background: var(--apex-plat-hi); animation: badge-pulse 1.4s ease-in-out infinite; }
 @keyframes badge-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+/* ── Candado de cliente (vista bloqueada a una cuenta, acceso vía equipo) ── */
+.client-lock { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--apex-accent, var(--apex-plat-hi)); border: 1px solid color-mix(in srgb, var(--apex-accent, var(--apex-border-strong)) 45%, var(--apex-border)); background: color-mix(in srgb, var(--apex-accent, transparent) 8%, transparent); padding: 5px 6px 5px 11px; border-radius: var(--apex-radius-pill, 999px); }
+.client-lock-name { color: var(--apex-plat-hi); font-weight: 500; }
+.client-lock-back { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 11px; color: var(--apex-plat-mid); background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); border-radius: var(--apex-radius-pill, 999px); padding: 3px 9px; cursor: pointer; transition: border-color 0.18s, color 0.18s; }
+.client-lock-back:hover { color: var(--apex-plat-hi); border-color: var(--apex-accent, var(--apex-border-strong)); }
+
 /* ── Lista de llamadas ── */
 .ac-list { display: flex; flex-direction: column; gap: 10px; }
 .ac-item {
@@ -49,11 +55,11 @@
 .ac-input:focus { border-color: var(--apex-border-strong); }
 .ac-btn {
   padding: 10px 16px; cursor: pointer;
-  background: var(--apex-plat-hi); color: var(--apex-bg-deep, #0a0c12);
-  border: 1px solid var(--apex-plat-hi); font-family: var(--apex-font); font-size: 13px;
-  transition: background 0.18s, opacity 0.18s; white-space: nowrap;
+  background: var(--apex-accent, var(--apex-plat-hi)); color: var(--apex-accent-ink, var(--apex-bg-deep, #0a0c12));
+  border: 1px solid var(--apex-accent, var(--apex-plat-hi)); font-family: var(--apex-font); font-size: 13px;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, opacity 0.18s; white-space: nowrap;
 }
-.ac-btn:hover:not(:disabled) { background: var(--apex-plat-mid); border-color: var(--apex-plat-mid); }
+.ac-btn:hover:not(:disabled) { background: var(--apex-accent-h, var(--apex-plat-mid)); border-color: var(--apex-accent-h, var(--apex-plat-mid)); }
 .ac-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .ac-hint { margin: 8px 0 0; font-size: 12px; color: var(--apex-plat-low); line-height: 1.5; }
 
@@ -119,6 +125,7 @@
 .pl-next { margin-top: 10px; font-size: 12px; color: var(--apex-plat-mid); line-height: 1.45; }
 .pl-next-label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--apex-plat-low); margin-bottom: 2px; }
 .pl-col-empty { font-size: 12px; color: var(--apex-plat-shad); padding: 8px 2px; }
+.pl-dot { display: none; }  /* status dot: visible solo en tema neón (ver ApexTheme.css §14) */
 
 /* ── Ajustes ── */
 .set-card { padding: 22px 24px; }
@@ -132,7 +139,7 @@
 .set-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .set-note { margin: 12px 0 0; font-size: 12px; color: var(--apex-plat-low); line-height: 1.5; }
 .set-meter { height: 8px; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); overflow: hidden; }
-.set-meter-fill { height: 100%; background: var(--apex-plat-hi); }
+.set-meter-fill { height: 100%; background: var(--apex-accent, var(--apex-plat-hi)); }
 
 /* ── Detalle · vídeo ── */
 .cd-video-card { padding: 0; overflow: hidden; }
@@ -147,7 +154,7 @@
 .goal-nums { font-size: 18px; color: var(--apex-plat-hi); font-variant-numeric: tabular-nums; }
 .goal-of { font-size: 13px; color: var(--apex-plat-low); }
 .goal-bar { height: 8px; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); overflow: hidden; }
-.goal-bar-fill { height: 100%; background: var(--apex-plat-hi); transition: width 0.4s var(--apex-ease-editorial); }
+.goal-bar-fill { height: 100%; background: var(--apex-accent, var(--apex-plat-hi)); transition: width 0.4s var(--apex-ease-editorial); }
 .goal-bar-fill[data-pace="low"] { background: var(--apex-status-neg, #E58371); }
 .goal-bar-fill[data-pace="ok"]  { background: var(--apex-status-pos, #5BD6A0); }
 .goal-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--apex-plat-low); }
@@ -166,6 +173,17 @@
 .fx-chart-card { padding: 20px 22px; }
 .fx-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
 .fx-chart-head h3 { margin: 0; font-weight: 400; font-size: 15px; color: var(--apex-plat-hi); }
+
+/* ── Anillos de progreso (gauges) — visibles solo en tema neón (ver §14) ── */
+.ring-row { display: none; }
+.ring-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 18px; text-align: center; }
+.ring-wrap { position: relative; }
+.ring-svg { display: block; }
+.ring-track { stroke: var(--apex-alpha-4); }
+.ring-arc { stroke: var(--apex-accent, var(--apex-plat-hi)); }
+.ring-text { fill: var(--apex-plat-hi); font-family: var(--apex-font); font-size: 24px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.ring-label { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--apex-plat-low); }
+.ring-sub { font-size: 11px; color: var(--apex-plat-low); }
 
 /* ── Tabla genérica ── */
 .tbl-wrap { overflow-x: auto; }
@@ -258,7 +276,7 @@
 .live-rail-n { width: 20px; height: 20px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--apex-border); font-size: 11px; }
 .live-stage { background: var(--apex-card-bg); border: 1px solid var(--apex-border); padding: 28px 30px; min-height: 420px; display: flex; flex-direction: column; }
 .live-progress { height: 3px; background: var(--apex-trigger-bg); margin-bottom: 22px; }
-.live-progress-fill { height: 100%; background: var(--apex-plat-hi); transition: width 0.3s; }
+.live-progress-fill { height: 100%; background: var(--apex-accent, var(--apex-plat-hi)); transition: width 0.3s; }
 .live-phase-title { margin: 0 0 18px; font-weight: 400; font-size: 26px; color: var(--apex-plat-hi); letter-spacing: -0.01em; }
 .live-lines { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 14px; }
 .live-lines li { font-size: 17px; line-height: 1.5; color: var(--apex-plat-hi); }
@@ -276,7 +294,8 @@
 .live-result { max-width: 560px; padding: 28px 30px; }
 .live-outcomes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .live-outcome { padding: 10px 16px; background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); color: var(--apex-plat-mid); font-family: var(--apex-font); font-size: 13px; cursor: pointer; }
-.live-outcome[data-sel] { background: var(--apex-plat-hi); color: var(--apex-bg-deep, #0a0c12); border-color: var(--apex-plat-hi); }
+.live-outcome[data-sel] { background: var(--apex-accent, var(--apex-plat-hi)); color: var(--apex-accent-ink, var(--apex-bg-deep, #0a0c12)); border-color: var(--apex-accent, var(--apex-plat-hi)); }
+.live-wave { display: none; }  /* onda de audio: visible solo en tema neón (ver §14) */
 @media (max-width: 980px) { .live-main { grid-template-columns: 1fr; } .live-rail { flex-direction: row; flex-wrap: wrap; } .live-side { order: 3; } }
 
 /* ── Sub-pestañas (segmented) ── */

@@ -61,7 +61,7 @@ export default function Home() {
 
   return (
     <>
-      <FloatingHeader title="Tu día" eyebrow="PANEL" actions={
+      <FloatingHeader title="Tu día" eyebrow="" actions={
         <FilterBar time={time} onTime={setTime}>
           <SelectFilter label="Cliente" value={client} options={CLIENT_OPTIONS} onChange={setClient} />
         </FilterBar>} />
