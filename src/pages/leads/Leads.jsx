@@ -37,7 +37,7 @@ const mapRow = (r) => ({ ...r, summary: r.summary || null, messages: r.messages 
 
 export default function Leads() {
   const navigate = useNavigate()
-  const [leads, setLeads] = useState(MOCK_LEADS)
+  const [leads, setLeads] = useState([])          // vacío hasta que responde el backend (no flashear mock)
   const [source, setSource] = useState('loading') // loading | live | mock
   const [view, setView] = useState('kanban')
   const [filters, setFilters] = useState({})

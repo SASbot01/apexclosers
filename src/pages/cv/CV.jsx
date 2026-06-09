@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ShieldCheck, Trophy, Calendar, Share2, Play, ArrowLeft, MapPin } from 'lucide-react'
 import { useApexTheme } from '../../shell/ThemeContext'
-import { getUserId } from '../../lib/config'
+import { API_BASE, getUserId } from '../../lib/config'
 import { getProfile, getProfileById } from '../../lib/profileApi'
 import { getRanking } from '../../lib/workflowApi'
 import { CLIENTS } from '../../data/mock/clients'
-import { MOCK_CALLS } from '../../data/mock/calls'
 import ProgressRing from '../../components/ProgressRing'
 import AnimatedValue from '../../components/AnimatedValue'
 
@@ -37,12 +36,18 @@ export default function CV() {
   const isOwn = targetId === getUserId()
   const [data, setData] = useState(null)
   const [rank, setRank] = useState(null)
+  const [calls, setCalls] = useState([])
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const p = (userId && userId !== getUserId()) ? getProfileById(targetId) : getProfile()
     p.then(setData).catch(() => setData(false))
     getRanking('global').then(d => setRank((d.ranking || []).find(r => r.user_id === targetId) || null)).catch(() => { })
+    // Llamadas destacadas REALES del closer (las 3 últimas cerradas/realizadas).
+    fetch(`${API_BASE}/api/recall?action=list&userId=${encodeURIComponent(targetId)}`)
+      .then(r => r.json())
+      .then(d => setCalls((d.calls || []).filter(c => c.status === 'done' && c.title).slice(0, 3)))
+      .catch(() => setCalls([]))
   }, [targetId, userId])
 
   const share = () => { try { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* off */ } }
@@ -52,7 +57,6 @@ export default function CV() {
 
   const { profile, metrics = [] } = data
   const m = Object.fromEntries(metrics.map(x => [x.key, x]))
-  const calls = MOCK_CALLS.filter(c => c.status === 'done' && c.title).slice(0, 3)
   const agenda = (profile.links || []).find(l => /agenda|calendly|reserv|cita|book/i.test(`${l.label} ${l.url}`))
   const otherLinks = (profile.links || []).filter(l => l !== agenda)
   const levelName = !rank ? null : rank.rank <= 3 ? 'Leyenda' : rank.rank <= 10 ? 'Élite' : rank.rank <= 30 ? 'Pro' : 'Retador'
@@ -118,7 +122,7 @@ export default function CV() {
             </div>
           </section>
 
-          <section className="cv-sec">
+          {calls.length > 0 && <section className="cv-sec">
             <h2 className="cv-h">Llamadas destacadas</h2>
             <p className="cv-note">Grabaciones seleccionadas para que veas cómo cierra en directo.</p>
             <div className="cv-calls">
@@ -133,7 +137,7 @@ export default function CV() {
                 </a>
               ))}
             </div>
-          </section>
+          </section>}
 
           <footer className="cv-foot">Currículum dinámico · se actualiza en tiempo real con sus resultados · <b>Apex Closers</b></footer>
         </article>

@@ -102,6 +102,7 @@ function BillingTab() {
   const pct = Math.min(100, Math.round((used / quota) * 100))
   return (
     <>
+      <p className="set-note" style={{ margin: '0 0 14px' }}>Vista previa · la facturación real (plan, uso, método de pago y facturas) se activa al conectar Whop/Stripe en el despliegue. Los importes mostrados son de ejemplo.</p>
       <div className="apex-card set-card set-plan">
         <div className="set-plan-info">
           <span className="set-plan-tag">Plan actual</span>
@@ -205,6 +206,7 @@ function AffiliatesTab() {
   ]
   return (
     <>
+      <p className="set-note" style={{ margin: '0 0 14px' }}>Vista previa · el programa de afiliados (seguimiento de referidos y pagos de comisión) se activa al conectar el proveedor de pagos. Las cifras y referidos mostrados son de ejemplo.</p>
       <div className="apex-card set-card">
         <h3>Programa de afiliados</h3>
         <p className="set-note" style={{ margin: '0 0 14px' }}>Gana <b>30% recurrente</b> por cada closer que se suscriba con tu link (15% en plan Starter). Se paga mientras tu referido siga activo.</p>

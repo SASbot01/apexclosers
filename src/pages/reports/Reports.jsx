@@ -1,11 +1,11 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import FloatingHeader from '../../components/FloatingHeader'
 import FilterBar, { SelectFilter } from '../../components/Filters'
 import SegTabs from '../../components/SegTabs'
-import { MOCK_REPORTS } from '../../data/mock/reports'
 import { CLIENT_OPTIONS } from '../../data/mock/clients'
 import { inWindow } from '../../lib/filters'
-import { getManualReports, importReportsCsv, addReportEntry } from '../../lib/metrics'
+import { importReportsCsv, addReportEntry } from '../../lib/metrics'
+import { listReports } from '../../lib/reportsApi'
 
 /*
  * Reports (vista "Embudo") — Agendadas→Realizadas→Ofertas→Depósitos→Cierres.
@@ -25,10 +25,11 @@ export default function Reports() {
   const [form, setForm] = useState(null)
   const fileRef = useRef(null)
 
-  const rows = useMemo(() => [...MOCK_REPORTS, ...getManualReports()]
+  const [allRows, setAllRows] = useState([])
+  useEffect(() => { listReports(client).then(setAllRows).catch(() => setAllRows([])) }, [client, tick])
+  const rows = useMemo(() => allRows
     .filter(r => inWindow(r.date, time))
-    .filter(r => client === 'all' || r.client_id === client)
-    .sort((a, b) => b.date.localeCompare(a.date)), [time, client, tick])
+    .sort((a, b) => b.date.localeCompare(a.date)), [allRows, time])
 
   const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0)
   const scheduled = sum('scheduled'), realizadas = sum('realizadas'), offers = sum('offers'), deposits = sum('deposits'), closes = sum('closes')

@@ -28,6 +28,7 @@ import { transcribeUrl, localSttReady } from './_lib/localStt.js'
 import {
   EXTRACTION_SYSTEM, normalizeExtraction, saleCashFor, factsLine,
   summarySystem, buildCoachingContext,
+  SKILLS_SYSTEM, normalizeSkills, transcriptStats,
 } from './_lib/callAnalysis.js'
 import { notify, enqueueFollowUps } from './_lib/workflow.js'
 
@@ -237,11 +238,40 @@ async function finalize(req, res) {
     } catch (e) { console.error('[finalize] summary failed', e.message) }
   }
 
+  // 3) HABILIDADES (Workshop): puntúa al closer en las 6 fases + estilo. Se
+  // cachea en calls.skills; el Workshop las agrega. Defensivo: si falla, null.
+  let skills = null
+  if (hasText && (useLocalLLM || anthropic)) {
+    try {
+      const userMsg = transcriptText.slice(0, 30000)
+      let text
+      if (useLocalLLM) {
+        text = await localChat({ system: SKILLS_SYSTEM, user: userMsg, maxTokens: 400, json: true })
+      } else {
+        const r = await anthropic.messages.create({
+          model: SUMMARY_MODEL, max_tokens: 400, system: SKILLS_SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        })
+        text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+      }
+      const m = text.match(/\{[\s\S]*\}/)
+      if (m) skills = normalizeSkills(JSON.parse(m[0]))
+    } catch (e) { console.error('[finalize] skills failed', e.message) }
+    // Completa volumen/preguntas con lo medible de la transcripción.
+    if (skills) {
+      const st = transcriptStats(transcript)
+      skills.words = st.words
+      if (st.minutes) skills.minutes = Math.round(st.minutes * 10) / 10
+      if (!skills.questions && st.questions) skills.questions = st.questions
+    }
+  }
+
   await supabase.from('calls').update({
     transcript,
     recording_url:     recordingUrl || null,
     summary,
     feedback,
+    skills,
     outcome:           outcomeData?.outcome || 'unknown',
     offer_made:        !!outcomeData?.offer_made,
     offer_amount:      outcomeData?.offer_amount ?? null,
@@ -323,7 +353,7 @@ async function listCalls(req, res) {
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const { data } = await supabase
     .from('calls')
-    .select('id, bot_id, title, status, platform, scheduled_at, started_at, ended_at, outcome, summary, next_step, transcript')
+    .select('id, bot_id, title, status, platform, scheduled_at, started_at, ended_at, outcome, summary, next_step, transcript, recording_url, deal_amount')
     .eq('user_id', userId)
     .order('started_at', { ascending: false, nullsFirst: false })
     .limit(200)

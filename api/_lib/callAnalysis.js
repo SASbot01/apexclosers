@@ -142,6 +142,75 @@ export function factsLine(o) {
   return parts.join(' · ')
 }
 
+// ── Puntuación de habilidades (Workshop) ──────────────────────────────────
+// La IA lee la transcripción y PUNTÚA al closer en las 6 fases del cierre + el
+// estilo (habla/escucha, ritmo, tono). Esto alimenta el hexagrama, el cuello de
+// botella y el "tono y ritmo" del Workshop. Lo calcula recall.finalize y, en
+// llamadas antiguas sin puntuar, api/workshop.js de forma perezosa.
+export const SKILLS_SYSTEM = `Eres un coach de ventas senior. Lees la transcripción de una llamada de venta (el CLOSER vende; el otro es el CLIENTE/prospecto) y EVALÚAS AL CLOSER. Puntúa de 0.0 a 1.0 (un decimal) cada una de las 6 fases del cierre, según lo BIEN que las ejecutó en ESTA llamada:
+
+- apertura: tomar el control, fijar agenda y autoridad al empezar.
+- descubrimiento: indagar dolor, cuantificar impacto, hacer buenas preguntas.
+- propuesta: presentar anclando valor/ROI antes que precio.
+- objeciones: manejar pegas (precio, tiempo, confianza) sin caerse.
+- cierre: pedir el sí con claridad, cierre asumido, usar el silencio.
+- seguimiento: dejar un próximo paso concreto y agendado.
+
+Además estima el ESTILO del closer en esta llamada:
+- talk_ratio: fracción 0..1 del tiempo que habla el CLOSER (no el cliente).
+- wpm: ritmo de habla aproximado del closer en palabras por minuto (entero 90-200).
+- questions: nº de preguntas que hizo el closer (entero).
+- tono: reparte 100 puntos entre seguridad, empatia y dudas según el tono dominante del closer.
+
+Devuelve SOLO un JSON válido (sin markdown, sin texto fuera del JSON) con EXACTAMENTE esta forma:
+{"apertura":0.0,"descubrimiento":0.0,"propuesta":0.0,"objeciones":0.0,"cierre":0.0,"seguimiento":0.0,"talk_ratio":0.0,"wpm":0,"questions":0,"tono":{"seguridad":0,"empatia":0,"dudas":0}}
+Si la transcripción es muy corta o no hay señal de una fase, puntúala baja (no la inventes alta).`
+
+const SKILL_KEYS = ['apertura', 'descubrimiento', 'propuesta', 'objeciones', 'cierre', 'seguimiento']
+const clamp01 = (v) => Math.max(0, Math.min(1, v))
+
+// Normaliza el JSON del modelo al shape exacto que guardamos en calls.skills.
+export function normalizeSkills(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const out = {}
+  let any = false
+  for (const k of SKILL_KEYS) {
+    const n = Number(raw[k])
+    out[k] = Number.isFinite(n) ? Math.round(clamp01(n) * 100) / 100 : 0
+    if (Number.isFinite(n)) any = true
+  }
+  if (!any) return null
+  const tr = Number(raw.talk_ratio)
+  out.talk_ratio = Number.isFinite(tr) ? Math.round(clamp01(tr) * 100) / 100 : 0.5
+  const wpm = Number(raw.wpm)
+  out.wpm = Number.isFinite(wpm) ? Math.max(60, Math.min(240, Math.round(wpm))) : 130
+  const q = Number(raw.questions)
+  out.questions = Number.isFinite(q) ? Math.max(0, Math.round(q)) : 0
+  const t = raw.tono && typeof raw.tono === 'object' ? raw.tono : {}
+  let seg = Math.max(0, Number(t.seguridad) || 0)
+  let emp = Math.max(0, Number(t.empatia) || 0)
+  let dud = Math.max(0, Number(t.dudas) || 0)
+  const sum = seg + emp + dud
+  if (sum > 0) { seg = Math.round((seg / sum) * 100); emp = Math.round((emp / sum) * 100); dud = Math.max(0, 100 - seg - emp) }
+  else { seg = 50; emp = 30; dud = 20 }
+  out.tono = { seguridad: seg, empatia: emp, dudas: dud }
+  return out
+}
+
+// Métricas de volumen calculadas SIN IA directamente de la transcripción:
+// palabras totales y nº de preguntas (defensivo, complementa a la IA).
+export function transcriptStats(transcript) {
+  const T = Array.isArray(transcript) ? transcript : []
+  let words = 0, durMs = 0, questions = 0
+  for (const s of T) {
+    const txt = String(s.text || '')
+    words += txt.split(/\s+/).filter(Boolean).length
+    questions += (txt.match(/\?/g) || []).length
+    if (Number.isFinite(s.endMs) && Number.isFinite(s.startMs)) durMs += Math.max(0, s.endMs - s.startMs)
+  }
+  return { words, minutes: durMs ? durMs / 60000 : null, questions }
+}
+
 // ── Resumen + Feedback (con aprendizaje del historial) ────────────────────
 const BASE_SUMMARY = `Eres un asistente de ventas senior. Acabas de analizar una call de tu closer. Escribe en español, primera persona, voz cálida y directa.
 

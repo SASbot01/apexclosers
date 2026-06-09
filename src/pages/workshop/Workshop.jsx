@@ -11,6 +11,7 @@ import {
   AI_READOUT, SEED_CHATS,
 } from '../../data/mock/workshop'
 import { API_BASE, getUserId } from '../../lib/config'
+import { getWorkshop, listCoachChats, saveCoachChat, deleteCoachChat } from '../../lib/workshopApi'
 
 /*
  * Workshop — la sección de IA: transformamos las transcripciones en un mapa de
@@ -34,12 +35,31 @@ export default function Workshop() {
   const [client, setClient] = useState('all')
   const [metric, setMetric] = useState('close_rate')
   const [gran, setGran] = useState('mes')
+  const [remote, setRemote] = useState(null)   // datos reales del backend (o null → demo)
+  const [nonce, setNonce] = useState(0)
 
-  // Datos derivados de los filtros → al cambiar cliente/periodo, todo se recalcula.
-  const d = deriveWorkshop(client, period)
+  // Carga los datos reales del Workshop (habilidades, estilo, evolución…). Si no
+  // hay backend, se queda en null y la página cae a los datos demo deterministas.
+  useEffect(() => {
+    let alive = true
+    getWorkshop(period, client)
+      .then(r => { if (alive) setRemote(r) })
+      .catch(() => { if (alive) setRemote(null) })
+    return () => { alive = false }
+  }, [period, client, nonce])
+  const reload = () => setNonce(n => n + 1)
 
-  const ev = EVOLUTION[metric]
-  const series = evoSeries(metric, gran, d.seed)
+  // Datos reales si hay backend; si no, demo determinista por filtros.
+  const d = remote || deriveWorkshop(client, period)
+
+  // Evolución, cuello de botella y lectura IA: del backend o del catálogo demo.
+  const metricOptions = remote?.evolution
+    ? Object.entries(remote.evolution).map(([key, v]) => ({ key, label: v.label }))
+    : METRIC_OPTIONS
+  const ev = (remote?.evolution || EVOLUTION)[metric] || EVOLUTION[metric] || EVOLUTION.close_rate
+  const series = remote?.evolution?.[metric]?.series?.[gran] || evoSeries(metric, gran, d.seed || 0)
+  const bottleneck = remote?.bottleneck || deriveBottleneck(d)
+  const readout = remote?.readout || AI_READOUT
   const first = series[0]?.[1] ?? 0
   const last = series[series.length - 1]?.[1] ?? 0
   const delta = last - first
@@ -73,7 +93,7 @@ export default function Workshop() {
       } />
 
       <section className="apex-section">
-        <BottleneckCard data={deriveBottleneck(d)} />
+        <BottleneckCard data={bottleneck} onRefresh={reload} />
       </section>
 
       <section className="apex-section">
@@ -124,7 +144,7 @@ export default function Workshop() {
                 ))}
               </div>
               <HoverMenu label="Métrica" value={ev.label}>
-                {METRIC_OPTIONS.map(o => (
+                {metricOptions.map(o => (
                   <HoverMenu.Item key={o.key} selected={o.key === metric} onSelect={() => setMetric(o.key)}>{o.label}</HoverMenu.Item>
                 ))}
               </HoverMenu>
@@ -160,9 +180,9 @@ export default function Workshop() {
       </section>
 
       <section className="apex-section ws-readout">
-        <ReadoutCard title="Lo que mejor haces" items={AI_READOUT.strengths} tone="pos" delay={0} />
-        <ReadoutCard title="Dónde pierdes" items={AI_READOUT.weaknesses} tone="neg" delay={300} />
-        <ReadoutCard title="Tu plan ahora" items={AI_READOUT.next} tone="plan" delay={600} />
+        <ReadoutCard title="Lo que mejor haces" items={readout.strengths} tone="pos" delay={0} />
+        <ReadoutCard title="Dónde pierdes" items={readout.weaknesses} tone="neg" delay={300} />
+        <ReadoutCard title="Tu plan ahora" items={readout.next} tone="plan" delay={600} />
       </section>
 
       <section className="apex-section">
@@ -177,7 +197,7 @@ export default function Workshop() {
 // Cuello de botella principal + acción de mayor palanca, con IA y botón Actualizar.
 // El análisis sale de las transcripciones (en demo, determinista por filtros). El
 // botón re-analiza: intenta el backend de IA (/api/orbe) y cae a los datos demo.
-function BottleneckCard({ data }) {
+function BottleneckCard({ data, onRefresh }) {
   const [analyzing, setAnalyzing] = useState(false)
   const b = data   // se re-deriva solo al cambiar los filtros (cliente/periodo)
 
@@ -185,12 +205,9 @@ function BottleneckCard({ data }) {
     if (analyzing) return
     setAnalyzing(true)
     const minSpin = new Promise(r => setTimeout(r, 1200))   // que se note el re-análisis
-    try {
-      await fetch(`${API_BASE}/api/orbe?action=chat`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: getUserId(), messages: [{ role: 'user', body: 'Analiza mis transcripciones: ¿cuál es mi cuello de botella principal y la acción de mayor palanca?' }] }),
-      })
-    } catch { /* sin backend → datos demo */ }
+    // Re-pide el análisis real: el backend puntúa las llamadas pendientes y
+    // recalcula el cuello de botella con las transcripciones.
+    try { await onRefresh?.() } catch { /* sin backend → datos demo */ }
     await minSpin
     setAnalyzing(false)
   }
@@ -331,6 +348,27 @@ function WorkshopChat() {
   const persist = (next) => { setChats(next); writeChats(next) }
   useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight }, [active?.messages.length, busy, activeId])
 
+  // Carga los hilos guardados del backend (si hay). Sustituyen a los locales.
+  useEffect(() => {
+    let alive = true
+    listCoachChats().then(list => {
+      if (!alive || !list.length) return
+      const norm = list.map(c => ({ id: c.id, title: c.title, messages: c.messages || [], created_at: c.created_at }))
+      setChats(norm); writeChats(norm)
+      setActiveId(a => norm.find(c => c.id === a) ? a : norm[0].id)
+    }).catch(() => { /* sin backend → localStorage */ })
+    return () => { alive = false }
+  }, [])
+
+  // Persiste un hilo en el backend; si era id local, adopta el uuid devuelto.
+  const syncChat = (chat) => {
+    saveCoachChat({ id: chat.id, title: chat.title, messages: chat.messages }).then(saved => {
+      if (!saved || saved.id === chat.id) return
+      setChats(cur => { const upd = cur.map(c => c.id === chat.id ? { ...c, id: saved.id } : c); writeChats(upd); return upd })
+      setActiveId(cur => cur === chat.id ? saved.id : cur)
+    }).catch(() => { /* best-effort */ })
+  }
+
   function newConversation() {
     const conv = { id: 'w' + Date.now(), title: 'Conversación', messages: [], created_at: new Date().toISOString() }
     persist([conv, ...chats]); setActiveId(conv.id)
@@ -355,8 +393,11 @@ function WorkshopChat() {
       reply = res.ok && data.reply ? data.reply : demoReply(text)
     } catch { reply = demoReply(text) }
     const aMsg = { role: 'assistant', body: reply, ts: Date.now() }
+    const finalMessages = [...history, aMsg]
     setChats(cur => { const upd = cur.map(c => c.id === active.id ? { ...c, messages: [...c.messages, aMsg] } : c); writeChats(upd); return upd })
     setBusy(false)
+    // Guarda el hilo completo en el backend (best-effort).
+    syncChat({ id: active.id, title: (!active.title || active.title === 'Conversación') ? text.slice(0, 42) : active.title, messages: finalMessages })
   }
 
   return (

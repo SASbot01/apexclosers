@@ -1,8 +1,13 @@
-// Datos registrados por el usuario (resultados del guion · import CSV · reporte
-// manual). Se suman al baseline mock en Reports y Finanzas. Persistido en
-// localStorage (demo); en producción → tablas call_results/sales/reports.
-const RKEY = 'apex_closer_manual_reports' // [{id,client_id,date,scheduled,realizadas,offers,deposits,closes}]
-const SKEY = 'apex_closer_manual_sales'   // [{id,client_id,date,closer,product,revenue,cash_collected,payment_method,payment_type}]
+// Datos que el usuario registra a mano (resultados del guion · import CSV ·
+// reporte manual). Ahora van AL BACKEND: los reportes a la tabla `reports`
+// (/api/reports) y las ventas a la tabla `sales` (/api/sales, como 'manual'
+// pendiente de verificar). Mantenemos un espejo en localStorage como caché para
+// render instantáneo / offline; las escrituras son write-through (best-effort).
+import { addReportEntry as apiAddReport } from './reportsApi'
+import { saveSale } from './salesApi'
+
+const RKEY = 'apex_closer_manual_reports'
+const SKEY = 'apex_closer_manual_sales'
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || [] } catch { return [] } }
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* off */ } }
 const uid = (p) => p + Date.now().toString(36) + Math.floor(performance.now())
@@ -10,8 +15,7 @@ const uid = (p) => p + Date.now().toString(36) + Math.floor(performance.now())
 export const getManualReports = () => read(RKEY)
 export const getManualSales = () => read(SKEY)
 
-// Suma contadores a la fila del MISMO día (+ cliente). Si no existe, la crea.
-// → "si es de un día que ya tiene, simplemente se añade a lo del día".
+// Reporte de embudo de un día (+cliente). Caché local + backend (/api/reports).
 export function addReportEntry({ client_id = null, date, scheduled = 0, realizadas = 0, offers = 0, deposits = 0, closes = 0 }) {
   const rows = read(RKEY)
   const day = (date || new Date().toISOString()).slice(0, 10)
@@ -19,13 +23,21 @@ export function addReportEntry({ client_id = null, date, scheduled = 0, realizad
   if (!row) { row = { id: uid('mr'), client_id, date: day, scheduled: 0, realizadas: 0, offers: 0, deposits: 0, closes: 0 }; rows.push(row) }
   row.scheduled += scheduled; row.realizadas += realizadas; row.offers += offers; row.deposits += deposits; row.closes += closes
   write(RKEY, rows)
+  apiAddReport({ client_id, date: day, scheduled, realizadas, offers, deposits, closes }).catch(() => { /* offline → solo caché */ })
   return row
 }
 
+// Venta registrada a mano → tabla de ventas real (pendiente de verificar) + caché.
 export function addSale(sale) {
   const rows = read(SKEY)
-  rows.push({ id: uid('ms'), date: sale.date || new Date().toISOString(), client_id: sale.client_id || null, closer: sale.closer || '', product: sale.product || '', revenue: Number(sale.revenue || 0), cash_collected: Number(sale.cash_collected || 0), payment_method: sale.payment_method || '', payment_type: sale.payment_type || 'Pago único' })
+  const local = { id: uid('ms'), date: sale.date || new Date().toISOString(), client_id: sale.client_id || null, closer: sale.closer || '', product: sale.product || '', revenue: Number(sale.revenue || 0), cash_collected: Number(sale.cash_collected || 0), payment_method: sale.payment_method || '', payment_type: sale.payment_type || 'Pago único' }
+  rows.push(local)
   write(SKEY, rows)
+  saveSale({
+    client_id: local.client_id, date: local.date, closer: local.closer, product: local.product,
+    revenue: local.revenue, cash_collected: local.cash_collected, payment_method: local.payment_method,
+    payment_type: local.payment_type, source: 'manual', status: 'pending',
+  }).catch(() => { /* offline → solo caché */ })
   return rows
 }
 

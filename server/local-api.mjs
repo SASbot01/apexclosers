@@ -31,6 +31,11 @@ const ROUTES = {
   '/api/sequences':     (await import('../api/sequences.js')).default,
   '/api/notifications': (await import('../api/notifications.js')).default,
   '/api/ranking':       (await import('../api/ranking.js')).default,
+  '/api/workshop':      (await import('../api/workshop.js')).default,
+  '/api/goals':         (await import('../api/goals.js')).default,
+  '/api/reports':       (await import('../api/reports.js')).default,
+  '/api/conversations': (await import('../api/conversations.js')).default,
+  '/api/scripts':       (await import('../api/scripts.js')).default,
 }
 
 // Adapta el res de Node http al contrato Express/Vercel que usan los handlers.

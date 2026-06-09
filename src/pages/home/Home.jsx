@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
 import FilterBar, { SelectFilter } from '../../components/Filters'
@@ -6,10 +6,9 @@ import StatusBadge from '../../components/StatusBadge'
 import { useCalls } from '../../data/hooks/useCalls'
 import { fmtDateTime } from '../../lib/format'
 import { calendarBounds, inWindow } from '../../lib/filters'
-import { MONTHLY_GOALS } from '../../data/mock/goals'
 import { CLIENT_OPTIONS } from '../../data/mock/clients'
-import { MOCK_SALES } from '../../data/mock/sales'
-import { getManualSales } from '../../lib/metrics'
+import { getGoals, goalsAsList } from '../../lib/goalsApi'
+import { listSales } from '../../lib/salesApi'
 
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
@@ -22,6 +21,11 @@ export default function Home() {
   const { calls, loading } = useCalls()
   const [time, setTime] = useState('this_quarter')
   const [client, setClient] = useState('all')
+  const [goalBases, setGoalBases] = useState(goalsAsList(null))   // objetivos reales del usuario
+  const [sales, setSales] = useState([])                          // ventas verificadas reales
+
+  useEffect(() => { getGoals().then(g => setGoalBases(goalsAsList(g))).catch(() => {}) }, [])
+  useEffect(() => { listSales('verified').then(s => setSales(Array.isArray(s) ? s : [])).catch(() => {}) }, [])
 
   const inWin = calls
     .filter(c => inWindow(c.started_at || c.scheduled_at, time))
@@ -31,14 +35,14 @@ export default function Home() {
   const cashWon = won.reduce((a, c) => a + (c.deal_amount || 0), 0)
   const actuals = { calls: inWin.length, closes: won.length, cash: cashWon }
 
-  // % recollected = cash collected / revenue (de las ventas del periodo).
-  const salesWin = [...MOCK_SALES, ...getManualSales()].filter(s => inWindow(s.date, time)).filter(s => client === 'all' || s.client_id === client)
+  // % recollected = cash collected / revenue (de las ventas verificadas del periodo).
+  const salesWin = sales.filter(s => inWindow(s.date, time)).filter(s => client === 'all' || s.client_id === client)
   const recRev = salesWin.reduce((a, s) => a + (s.revenue || 0), 0)
   const recCash = salesWin.reduce((a, s) => a + (s.cash_collected || 0), 0)
   const recollected = recRev ? Math.round((recCash / recRev) * 100) : 0
 
   const { elapsedFrac, days } = calendarBounds(time)
-  const goals = MONTHLY_GOALS.map(g => {
+  const goals = goalBases.map(g => {
     const objetivo = Math.max(1, Math.round(g.base * days / 30))
     const actual = actuals[g.key] || 0
     const pct = Math.min(100, Math.round((actual / objetivo) * 100))
