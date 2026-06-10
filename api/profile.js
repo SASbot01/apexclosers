@@ -194,7 +194,7 @@ async function search(req, res) {
   const [{ data: profs }, { data: users }] = await Promise.all([
     supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url, status')
       .or(`nickname.ilike.${like},display_name.ilike.${like}`).limit(25),
-    supabase.from('users').select('id, name, email, picture')
+    supabase.from('users').select('id, name, email, picture, account_type')
       .or(`name.ilike.${like},email.ilike.${like}`).limit(25),
   ])
   const byId = new Map()
@@ -203,6 +203,7 @@ async function search(req, res) {
     const ex = byId.get(u.id) || { user_id: u.id, nickname: null, headline: null }
     ex.display_name = ex.display_name || u.name || (u.email ? u.email.split('@')[0] : 'Closer')
     ex.photo_url = ex.photo_url || u.picture || null
+    ex.account_type = u.account_type || 'closer'
     byId.set(u.id, ex)
   }
   let results = [...byId.values()]

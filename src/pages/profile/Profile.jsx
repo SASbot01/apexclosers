@@ -25,6 +25,13 @@ const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currenc
 const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
 const pct = (v) => v == null ? '—' : `${Math.round(v * 100)}%`
 const fmtVal = (m) => m.fmt === 'money' ? money(m.value) : m.fmt === 'pct' ? pct(m.value) : intf(m.value)
+
+// Etiqueta de tipo de cuenta junto al nombre: Closer (verde) o Empresa.
+function RoleChip({ type }) {
+  if (!type) return null
+  const client = type === 'client'
+  return <span style={{ fontSize: 9.5, padding: '1px 7px', borderRadius: 999, marginLeft: 6, border: '1px solid var(--apex-border)', color: client ? 'var(--apex-accent, var(--apex-plat-mid))' : 'var(--apex-plat-low)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{client ? 'Empresa' : 'Closer'}</span>
+}
 const initials = (name) => (name || '?').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase()
 
 export default function Profile() {
@@ -39,7 +46,7 @@ export default function Profile() {
   const [data, setData] = useState(null)     // { profile, metrics, isOwner, friendship }
   const [state, setState] = useState('loading')
   const [editing, setEditing] = useState(false)
-  const [tab, setTab] = useState('amigos')
+  const [tab, setTab] = useState(searchParams.get('tab') || 'amigos')
 
   const [rank, setRank] = useState(null)
   const [clients, setClients] = useState([])   // clientes reales del dueño del perfil (para "Cerrando para")
@@ -426,7 +433,7 @@ export function FriendsPanel({ onOpen }) {
               {results.map(r => (
                 <div className="pf-friend" key={r.user_id}>
                   <FriendAvatar p={r} />
-                  <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(r.user_id)}>{r.display_name}</span>{r.nickname && <span className="pf-friend-nick">@{r.nickname}</span>}<AvailabilityDot status={r.status} /></div>
+                  <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(r.user_id)}>{r.display_name}</span>{r.nickname && <span className="pf-friend-nick">@{r.nickname}</span>}<AvailabilityDot status={r.status} /><RoleChip type={r.account_type} /></div>
                   {r.relation === 'friends'
                     ? <span className="sales-mini" style={{ opacity: 0.7 }}>Amigo ✓</span>
                     : r.relation === 'pending_out'
@@ -448,7 +455,7 @@ export function FriendsPanel({ onOpen }) {
             {d.incoming.map(f => (
               <div className="pf-friend" key={f.requestId}>
                 <FriendAvatar p={f} />
-                <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(f.user_id)}>{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}</div>
+                <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(f.user_id)}>{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}<RoleChip type={f.account_type} /></div>
                 <button className="sales-mini sales-mini--go" onClick={() => respondInvite(f.requestId, true).then(load)}>Aceptar</button>
                 <button className="sales-mini" onClick={() => respondInvite(f.requestId, false).then(load)}>Rechazar</button>
               </div>
@@ -464,7 +471,7 @@ export function FriendsPanel({ onOpen }) {
           {d.friends.map(f => (
             <div className="pf-friend" key={f.user_id}>
               <FriendAvatar p={f} />
-              <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(f.user_id)}>{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}</div>
+              <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(f.user_id)}>{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}<RoleChip type={f.account_type} /></div>
               <button className="sales-mini" onClick={() => onOpen(f.user_id)}>Ver perfil</button>
               <button className="sales-mini sales-mini--del" onClick={() => removeFriend(f.user_id).then(load)}>✕</button>
             </div>
@@ -472,7 +479,7 @@ export function FriendsPanel({ onOpen }) {
           {d.outgoing.map(f => (
             <div className="pf-friend" key={f.requestId} style={{ opacity: 0.6 }}>
               <FriendAvatar p={f} />
-              <div className="pf-friend-id"><span className="pf-friend-name">{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}</div>
+              <div className="pf-friend-id"><span className="pf-friend-name">{f.display_name}</span>{f.nickname && <span className="pf-friend-nick">@{f.nickname}</span>}<RoleChip type={f.account_type} /></div>
               <span className="sales-badge" style={{ '--c': '#F2A765' }}>Pendiente</span>
             </div>
           ))}
@@ -516,7 +523,7 @@ export function GroupsPanel() {
             {g.members.map(m => (
               <div className="pf-friend" key={m.user_id}>
                 <FriendAvatar p={m} />
-                <div className="pf-friend-id"><span className="pf-friend-name">{m.display_name}</span>{m.nickname && <span className="pf-friend-nick">@{m.nickname}</span>}</div>
+                <div className="pf-friend-id"><span className="pf-friend-name">{m.display_name}</span>{m.nickname && <span className="pf-friend-nick">@{m.nickname}</span>}<RoleChip type={m.account_type} /></div>
                 <button className="sales-mini sales-mini--del" onClick={() => groupRemove(g.id, m.user_id).then(load)}>✕</button>
               </div>
             ))}

@@ -53,7 +53,7 @@ async function cardsFor(ids) {
   if (!list.length) return {}
   const [{ data: profs }, { data: users }] = await Promise.all([
     supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url, status').in('user_id', list),
-    supabase.from('users').select('id, name, email, picture').in('id', list),
+    supabase.from('users').select('id, name, email, picture, account_type').in('id', list),
   ])
   const byUser = new Map((users || []).map(u => [u.id, u]))
   const map = {}
@@ -67,6 +67,7 @@ async function cardsFor(ids) {
       headline: p?.headline || null,
       photo_url: p?.photo_url || u?.picture || null,
       status: p?.status || 'available',
+      account_type: u?.account_type || 'closer',
     }
   }
   return map
@@ -306,7 +307,7 @@ async function teamInvite(req, res) {
     kind: 'team_invite',
     title: 'Invitación a un equipo',
     body: `${company?.display_name || 'Una empresa'} te invita a su equipo${team?.name ? ` "${team.name}"` : ''}. Acéptala desde tu perfil.`,
-    link: '/perfil',
+    link: '/perfil?tab=equipo',
   }).catch(() => {})
   return res.status(200).json({ ok: true })
 }
@@ -342,7 +343,7 @@ async function teamChatSend(req, res) {
     const recipients = new Set([team?.owner_id, ...(mems || []).map(m => m.user_id)].filter(Boolean))
     recipients.delete(userId)
     const author = (await cardsFor([userId]))[userId]?.display_name || 'Alguien'
-    for (const r of recipients) await notify(r, { kind: 'team_chat', title: `Mensaje en ${team?.name || 'tu equipo'}`, body: `${author}: ${String(body).slice(0, 80)}`, link: '/perfil' }).catch(() => {})
+    for (const r of recipients) await notify(r, { kind: 'team_chat', title: `Mensaje en ${team?.name || 'tu equipo'}`, body: `${author}: ${String(body).slice(0, 80)}`, link: '/perfil?tab=equipo' }).catch(() => {})
   } catch { /* best-effort */ }
   return res.status(200).json({ message: data })
 }

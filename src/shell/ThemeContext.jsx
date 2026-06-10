@@ -2,7 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 // Sistema de temas vía [data-theme]. 3 temas: Apex Neón (principal · verde/negro),
 // Apex Dark (el oscuro original) y Apex Light.
-const STORAGE_KEY = 'apex_closer_theme'
+// v2: ignora preferencias antiguas para que TODOS arranquen en Apex Neón (verde/
+// negro), el tema principal. Quien lo cambie a mano se guarda bajo esta clave.
+const STORAGE_KEY = 'apex_closer_theme_v2'
 const DEFAULT_THEME = 'neon'
 export const THEMES = [
   { key: 'neon',  label: 'Apex Neón' },

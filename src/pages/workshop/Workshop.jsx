@@ -23,7 +23,9 @@ import { getWorkshop, listCoachChats, saveCoachChat, deleteCoachChat } from '../
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const pct = (v) => `${Math.round((v || 0) * 100)}%`
 const CKEY = 'apex_closer_workshop_chats'
-const readChats = () => { try { const r = JSON.parse(localStorage.getItem(CKEY)); return Array.isArray(r) && r.length ? r : SEED_CHATS } catch { return SEED_CHATS } }
+// Conversación vacía inicial (sin chats demo): el coach responde con tu LLM real.
+const blankChats = () => [{ id: 'default', title: 'Conversación', messages: [], created_at: new Date().toISOString() }]
+const readChats = () => { try { const r = JSON.parse(localStorage.getItem(CKEY)); const c = (Array.isArray(r) ? r : []).filter(x => !String(x.id).startsWith('w-seed')); return c.length ? c : blankChats() } catch { return blankChats() } }
 const writeChats = (l) => { try { localStorage.setItem(CKEY, JSON.stringify(l)) } catch { /* off */ } }
 
 function demoReply(q) {
