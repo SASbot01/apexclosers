@@ -383,7 +383,7 @@ function EditProfile({ profile, onDone }) {
 }
 const Field = ({ label, children }) => <div><label className="sc-lbl">{label}</label>{children}</div>
 
-function FriendsPanel({ onOpen }) {
+export function FriendsPanel({ onOpen }) {
   const [d, setD] = useState({ friends: [], incoming: [], outgoing: [] })
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
@@ -483,7 +483,7 @@ function FriendsPanel({ onOpen }) {
   )
 }
 
-function GroupsPanel() {
+export function GroupsPanel() {
   const [groups, setGroups] = useState([])
   const [friends, setFriends] = useState([])
   const [name, setName] = useState('')
