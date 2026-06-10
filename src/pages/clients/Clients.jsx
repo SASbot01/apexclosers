@@ -28,6 +28,8 @@ export default function Clients() {
   const [busy, setBusy] = useState({})           // id → 'proof' | 'verify'
   const saveTimers = useRef({})
   const fileInputs = useRef({})
+  const salesRef = useRef(sales)                 // espejo del estado para leerlo en el debounce
+  useEffect(() => { salesRef.current = sales }, [sales])
   const [searchParams] = useSearchParams()
   const lockedClient = searchParams.get('client') || null   // vista bloqueada a una cuenta (vía equipo)
 
@@ -56,9 +58,11 @@ export default function Clients() {
   const patchSale = (id, patch) => {
     setSales(ss => ss.map(s => s.id === id ? { ...s, ...patch } : s))
     clearTimeout(saveTimers.current[id])
-    const current = sales.find(s => s.id === id)
-    const next = { ...current, ...patch }
     saveTimers.current[id] = setTimeout(() => {
+      // Leemos la fila ACTUAL (con todas las ediciones acumuladas), no la del
+      // closure de render: editar dos campos en <500ms ya no pierde el primero.
+      const next = salesRef.current.find(s => s.id === id)
+      if (!next) return
       saveSale(next).then(saved => {
         if (saved && saved.id !== id) setSales(ss => ss.map(s => s.id === id ? saved : s))
       }).catch(() => { /* offline */ })

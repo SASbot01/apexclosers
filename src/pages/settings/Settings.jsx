@@ -277,6 +277,7 @@ function MetricsVisibilityCard() {
   const [list, setList] = useState([])
   const [visible, setVisible] = useState({})
   const [state, setState] = useState('loading')
+  const [saveErr, setSaveErr] = useState(null)
 
   useEffect(() => {
     Promise.all([getMetrics(), getVisibility()])
@@ -285,9 +286,10 @@ function MetricsVisibilityCard() {
   }, [])
 
   const toggle = (key) => {
+    const prev = visible
     const next = { ...visible, [key]: !visible[key] }
-    setVisible(next)
-    apiSetVisibility(next).catch(() => { /* offline */ })
+    setVisible(next); setSaveErr(null)   // optimista
+    apiSetVisibility(next).catch(() => { setVisible(prev); setSaveErr('No pude guardar la visibilidad. Inténtalo de nuevo.') })
   }
 
   return (
@@ -296,6 +298,7 @@ function MetricsVisibilityCard() {
       <p className="set-note" style={{ margin: '0 0 12px' }}>
         Elige qué métricas se ven en tu perfil. Las <b>Públicas</b> las pueden ver tus amigos, grupos y la gente que invites; las <b>Privadas</b>, solo tú.
       </p>
+      {saveErr && <p className="set-note" style={{ margin: '0 0 12px', color: 'var(--apex-danger, #e0746a)' }}>{saveErr}</p>}
       {state === 'error' && <p className="set-note">No pude cargar las métricas (¿backend?).</p>}
       {state === 'loading' && <p className="set-note">Cargando…</p>}
       <div className="set-metrics">

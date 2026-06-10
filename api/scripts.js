@@ -29,7 +29,11 @@ async function getScript(req, res) {
   const clientKey = req.query.clientKey || null
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   if (!supabaseReady()) return res.status(200).json({ script: null })
-  const { data } = await supabase.from('scripts').select('content, updated_at').eq('owner_id', userId).eq('client_key', clientKey).maybeSingle()
+  // .eq('client_key', null) no matchea NULL → el guion general (sin cliente) no
+  // recargaba. Para clientKey null usamos .is(...,null).
+  let q = supabase.from('scripts').select('content, updated_at').eq('owner_id', userId)
+  q = clientKey === null ? q.is('client_key', null) : q.eq('client_key', clientKey)
+  const { data } = await q.maybeSingle()
   return res.status(200).json({ script: data?.content || null })
 }
 

@@ -22,8 +22,9 @@ async function req(action, { method = 'GET', body } = {}) {
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || `api ${res.status}`)
     return data
-  } catch {
-    return { goals: DEFAULTS }   // sin backend → defaults
+  } catch (e) {
+    if (method === 'GET') return { goals: DEFAULTS }   // sin backend → defaults (solo lectura)
+    throw e   // en escritura no fingimos éxito
   }
 }
 

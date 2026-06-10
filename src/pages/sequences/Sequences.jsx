@@ -81,7 +81,7 @@ export default function Sequences() {
               {draft.steps.map((s, i) => (
                 <div key={i} className="apex-card seq-step">
                   <div>
-                    <input className="ac-input" type="number" min="0" value={s.delay_hours} onChange={e => setStep(i, 'delay_hours', e.target.value)} title="Horas tras la llamada" />
+                    <input className="ac-input" type="number" min="0" value={s.delay_hours} onChange={e => setStep(i, 'delay_hours', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0))} title="Horas tras la llamada" />
                     <span style={{ fontSize: 10, color: 'var(--apex-plat-low)' }}>horas</span>
                   </div>
                   <select className="ac-input" value={s.channel} onChange={e => setStep(i, 'channel', e.target.value)}>

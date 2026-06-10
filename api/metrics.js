@@ -104,7 +104,9 @@ async function getMetrics(req, res) {
   const list = METRIC_DEFS
     .filter(d => isOwner || visible[d.key] === true)   // a terceros, solo públicas
     .map(d => ({ ...d, value: metrics ? metrics[d.key] : null, public: visible[d.key] === true }))
-  return res.status(200).json({ metrics, list, visibility: visible, isOwner })
+  // A terceros NO devolvemos el objeto crudo `metrics` (lleva TODOS los valores
+  // privados) ni el mapa de visibilidad completo: solo el `list` ya filtrado.
+  return res.status(200).json({ metrics: isOwner ? metrics : null, list, visibility: isOwner ? visible : {}, isOwner })
 }
 
 async function getVisibility(req, res) {

@@ -140,12 +140,32 @@ function CompanyProfile({ profile, onSaved }) {
     links: profile.links?.length ? profile.links : [{ label: 'Web', url: '' }],
   })
   const [photo, setPhoto] = useState(profile.photo_url || null)
+  const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setLink = (i, k, v) => setForm(f => ({ ...f, links: f.links.map((l, j) => j === i ? { ...l, [k]: v } : l) }))
   const addLink = () => setForm(f => ({ ...f, links: [...f.links, { label: '', url: '' }] }))
-  const onPhoto = async (file) => { if (!file) return; const url = await fileToDataUrl(file); setPhoto(url); await uploadPhoto(url, file.name).catch(() => {}) }
-  const save = async () => { setSaving(true); await updateProfile({ ...form, links: form.links.filter(l => l.url) }).catch(() => {}); setSaving(false); onSaved() }
+  const onPhoto = async (file) => {
+    if (!file) return
+    if (!file.type?.startsWith('image/')) { setErr('Ese archivo no es una imagen.'); return }
+    if (file.size > 8 * 1024 * 1024) { setErr('La imagen es muy grande (máx. 8 MB).'); return }
+    setErr(null); setUploading(true)
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      setPhoto(dataUrl)   // preview inmediato
+      const { photo_url } = await uploadPhoto(dataUrl, file.name)
+      setPhoto(photo_url) // ahora sí, la URL persistida del servidor
+    } catch { setErr('No pude subir el logo. Comprueba que el backend está arrancado e inténtalo de nuevo.'); setPhoto(profile.photo_url || null) }
+    finally { setUploading(false) }
+  }
+  const save = async () => {
+    setSaving(true); setErr(null)
+    try {
+      await updateProfile({ ...form, links: form.links.filter(l => l.url?.trim()), photo_url: photo ?? null })
+      onSaved()
+    } catch { setErr('No pude guardar el perfil. Inténtalo de nuevo.'); setSaving(false) }
+  }
 
   return (
     <section className="apex-section">
@@ -155,8 +175,9 @@ function CompanyProfile({ profile, onSaved }) {
             <span className="pf-avatar">{photo ? <img src={photo} alt="" /> : <span>{initials(form.display_name)}</span>}</span>
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onPhoto(e.target.files?.[0])} />
           </label>
-          <div style={{ fontSize: 12.5, color: 'var(--apex-plat-low)' }}>Logo / foto de la empresa</div>
+          <div style={{ fontSize: 12.5, color: 'var(--apex-plat-low)' }}>{uploading ? 'Subiendo logo…' : 'Logo / foto de la empresa'}</div>
         </div>
+        {err && <div className="cal2-err" style={{ marginTop: 0 }}>{err}</div>}
         <label className="sc-lbl">Nombre de la empresa</label>
         <input className="ac-input" value={form.display_name} onChange={e => set('display_name', e.target.value)} placeholder="Tu empresa" />
         <label className="sc-lbl">Titular corto</label>
@@ -173,7 +194,7 @@ function CompanyProfile({ profile, onSaved }) {
           </div>
         ))}
         <button className="ac-btn" style={{ ...ghost, justifySelf: 'start' }} onClick={addLink}>+ Añadir link</button>
-        <button className="ac-btn" style={{ justifySelf: 'start' }} onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar perfil'}</button>
+        <button className="ac-btn" style={{ justifySelf: 'start' }} onClick={save} disabled={saving || uploading}>{saving ? 'Guardando…' : 'Guardar perfil'}</button>
       </div>
     </section>
   )

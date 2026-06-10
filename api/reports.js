@@ -75,8 +75,12 @@ async function addEntry(req, res) {
   const e = entry || {}
   const date = dayOf(e.date)
   const client_id = e.client_id || null
-  // Suma al día (+cliente) si ya existe.
-  const { data: existing } = await supabase.from('reports').select('*').eq('owner_id', userId).eq('date', date).eq('client_id', client_id).maybeSingle()
+  // Suma al día (+cliente) si ya existe. OJO: .eq('client_id', null) NO matchea
+  // NULL en SQL → hay que usar .is(...,null), si no se inserta una fila nueva
+  // cada vez en vez de sumar (totales del día inflados/duplicados).
+  let q = supabase.from('reports').select('*').eq('owner_id', userId).eq('date', date)
+  q = client_id === null ? q.is('client_id', null) : q.eq('client_id', client_id)
+  const { data: existing } = await q.maybeSingle()
   const add = (k) => (Number(existing?.[k]) || 0) + (Number(e[k]) || 0)
   const row = {
     owner_id: userId, date, client_id,

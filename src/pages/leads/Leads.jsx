@@ -49,6 +49,8 @@ export default function Leads() {
   const [dragId, setDragId] = useState(null)   // lead que se está arrastrando
   const [overCol, setOverCol] = useState(null) // columna resaltada al pasar por encima
   const saveTimers = useRef({})
+  const creating = useRef(new Set())    // ids temporales cuya alta está en vuelo
+  const pendingEdits = useRef({})       // últimas ediciones hechas mientras se crea
 
   // Carga desde el backend (CRM persistido). Si no hay backend, cae a mock.
   useEffect(() => {
@@ -62,6 +64,10 @@ export default function Leads() {
   // Persiste un lead en el backend (debounce por id para no saturar al teclear).
   const persist = (lead) => {
     if (source !== 'live') return
+    // Si el alta del lead aún está en vuelo, NO disparamos otro saveLead con el
+    // id temporal (crearía una fila duplicada). Guardamos la última edición y se
+    // vuelca bajo el id real cuando el alta resuelve.
+    if (creating.current.has(lead.id)) { pendingEdits.current[lead.id] = lead; return }
     clearTimeout(saveTimers.current[lead.id])
     saveTimers.current[lead.id] = setTimeout(() => {
       saveLead(lead).then(saved => {
@@ -129,10 +135,18 @@ export default function Leads() {
     const lead = { id, name: 'Nuevo lead', company: '', email: '', phone: '', value: null, stage: 'nuevo', source: SOURCES[0], tags: [], assignee: ASSIGNEES[0], next_step: '', client_id: filters.client || CLIENT_CYCLE[0], last_at: new Date().toISOString(), messages: [] }
     setLeads(ls => [lead, ...ls]); openLead(id)
     if (source === 'live') {
+      creating.current.add(id)
       saveLead(lead).then(saved => {
-        if (!saved) return
-        setLeads(ls => ls.map(l => l.id === id ? mapRow(saved) : l)); setOpenId(saved.id)
-      }).catch(() => { /* offline */ })
+        creating.current.delete(id)
+        if (!saved) { delete pendingEdits.current[id]; return }
+        // Si el usuario editó mientras se creaba, conservamos esos cambios sobre
+        // el id real y los persistimos; si no, usamos la fila del servidor.
+        const edited = pendingEdits.current[id]
+        delete pendingEdits.current[id]
+        const real = edited ? { ...mapRow(saved), ...edited, id: saved.id } : mapRow(saved)
+        setLeads(ls => ls.map(l => l.id === id ? real : l)); setOpenId(saved.id)
+        if (edited) persist(real)
+      }).catch(() => { creating.current.delete(id); delete pendingEdits.current[id] })
     }
   }
   const removeLead = (id) => {

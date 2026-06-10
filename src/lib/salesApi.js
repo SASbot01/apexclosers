@@ -13,18 +13,22 @@ async function call(base, action, { method = 'GET', query = {}, body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch {
-    return mockOrThrow(base, action, { query, body })
+    return mockOrThrow(base, action, { query, body }, method)
   }
   let data, ok = true
   try { data = await res.json() } catch { ok = false }
-  if (!ok) return mockOrThrow(base, action, { query, body })
+  if (!ok) return mockOrThrow(base, action, { query, body }, method)
   if (!res.ok) throw new Error(data.error || `api ${res.status}`)
   return data
 }
 
-function mockOrThrow(base, action, ctx) {
-  const m = mockResponse(base, action, ctx)
-  if (m !== undefined) return m
+// Demo SOLO en lecturas (GET). En escrituras nunca fingimos éxito: si no hay
+// backend, propagamos el error para que la UI no diga "guardado" en falso.
+function mockOrThrow(base, action, ctx, method = 'GET') {
+  if (method === 'GET') {
+    const m = mockResponse(base, action, ctx)
+    if (m !== undefined) return m
+  }
   throw new Error('backend_unavailable')
 }
 

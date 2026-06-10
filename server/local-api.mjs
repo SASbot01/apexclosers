@@ -98,7 +98,11 @@ server.listen(PORT, '127.0.0.1', () => {
 // Cada 5 min: programa bots de las calls inminentes + destraba colgadas.
 function startLocalCron() {
   const base = `http://127.0.0.1:${PORT}`
+  let running = false   // evita que un tick lento se solape con el siguiente
   const tick = async () => {
+    if (running) { console.log('[cron] tick anterior aún en curso, salto este'); return }
+    running = true
+    try {
     for (const action of ['schedule-bots']) {
       try {
         const r = await fetch(`${base}/api/calendar?action=${action}`, { method: 'GET' })
@@ -113,6 +117,7 @@ function startLocalCron() {
       const r = await processDueFollowUps()
       if (r.processed) console.log(`[cron] seguimientos ejecutados: ${r.processed}`)
     } catch { /* sin credenciales aún */ }
+    } finally { running = false }
   }
   // Pasada inmediata al arrancar: si el server se reinició dentro de la ventana
   // de una call inminente, la programa en segundos (no espera al primer tick de

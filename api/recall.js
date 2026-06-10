@@ -374,9 +374,10 @@ async function listCalls(req, res) {
 async function getCall(req, res) {
   const { id, userId } = req.query
   if (!id) return res.status(400).json({ error: 'id_required' })
-  let q = supabase.from('calls').select('*').eq('id', id)
-  if (userId) q = q.eq('user_id', userId)   // aislamiento por usuario
-  const { data } = await q.maybeSingle()
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  // Aislamiento por usuario SIEMPRE: sin el filtro, pasar solo el id devolvía la
+  // llamada de cualquiera (transcript + grabación). Ahora exige y filtra userId.
+  const { data } = await supabase.from('calls').select('*').eq('id', id).eq('user_id', userId).maybeSingle()
   if (!data) return res.status(404).json({ error: 'not_found' })
   // La URL de grabación de Recall es PREFIRMADA y CADUCA: la refrescamos bajo
   // demanda al abrir el detalle para que el vídeo siempre se vea (antes se

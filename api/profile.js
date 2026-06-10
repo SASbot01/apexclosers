@@ -141,6 +141,9 @@ async function updateProfile(req, res) {
     bio: profile.bio ?? null,
     location: profile.location ?? null,
     links: Array.isArray(profile.links) ? profile.links.filter(l => l && l.url).map(l => ({ label: String(l.label || l.url), url: String(l.url) })) : [],
+    // Solo tocamos photo_url si el cliente lo manda (así guardar el formulario
+    // persiste la foto junto al resto; si no viene, se conserva la existente).
+    ...(profile.photo_url !== undefined ? { photo_url: profile.photo_url || null } : {}),
     ...(['available', 'busy', 'inactive'].includes(profile.status) ? { status: profile.status } : {}),
     updated_at: new Date().toISOString(),
   }

@@ -332,6 +332,7 @@ function EditProfile({ profile, onDone }) {
     bio: profile.bio || '', location: profile.location || '', links: profile.links?.length ? profile.links : [{ label: '', url: '' }],
   })
   const [photo, setPhoto] = useState(profile.photo_url)
+  const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   const fileRef = useRef(null)
@@ -340,14 +341,22 @@ function EditProfile({ profile, onDone }) {
 
   const onPhoto = async (file) => {
     if (!file) return
-    try { const url = await uploadPhoto(await fileToDataUrl(file), file.name); setPhoto(url.photo_url) }
-    catch { setErr('No pude subir la foto.') }
+    if (!file.type?.startsWith('image/')) { setErr('Ese archivo no es una imagen.'); return }
+    if (file.size > 8 * 1024 * 1024) { setErr('La imagen es muy grande (máx. 8 MB).'); return }
+    setErr(null); setUploading(true)
+    try {
+      const { photo_url } = await uploadPhoto(await fileToDataUrl(file), file.name)
+      setPhoto(photo_url)
+    } catch { setErr('No pude subir la foto. Comprueba que el backend está arrancado e inténtalo de nuevo.') }
+    finally { setUploading(false) }
   }
   const save = async () => {
     setSaving(true); setErr(null)
     try {
-      const links = form.links.filter(l => l.url.trim())
-      await updateProfile({ ...form, links })
+      const links = form.links.filter(l => l.url?.trim())
+      // Mandamos también photo_url para que la foto quede persistida junto al
+      // resto del perfil (no depende solo de la llamada de subida).
+      await updateProfile({ ...form, links, photo_url: photo ?? null })
       onDone()
     } catch (e) { setErr(e.message === 'nickname_taken' ? 'Ese nickname ya está cogido.' : 'No pude guardar.'); setSaving(false) }
   }
@@ -358,7 +367,8 @@ function EditProfile({ profile, onDone }) {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div className="pf-avatar">{photo ? <img src={photo} alt="" /> : <span>{initials(form.display_name || form.nickname)}</span>}</div>
           <div>
-            <button className="ac-btn" style={ghost} onClick={() => fileRef.current?.click()}>Cambiar foto</button>
+            <button className="ac-btn" style={ghost} onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? 'Subiendo…' : 'Cambiar foto'}</button>
+            {photo && !uploading && <button className="ac-btn" style={{ ...ghost, marginLeft: 8 }} onClick={() => setPhoto(null)}>Quitar</button>}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { onPhoto(e.target.files?.[0]); e.target.value = '' }} />
           </div>
         </div>
@@ -381,7 +391,7 @@ function EditProfile({ profile, onDone }) {
         {err && <div className="cal2-err" style={{ marginTop: 0 }}>{err}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="ac-btn" style={ghost} onClick={onDone} disabled={saving}>Cancelar</button>
-          <button className="ac-btn" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+          <button className="ac-btn" onClick={save} disabled={saving || uploading}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </div>
       </div>
       <style>{PF_CSS}</style>
@@ -425,7 +435,9 @@ export function FriendsPanel({ onOpen }) {
             <input className="ac-input" style={{ maxWidth: 280 }} placeholder="Escribe un nombre o nickname…" value={q}
               onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} />
             <button className="ac-btn" style={ghost} onClick={doSearch}>Buscar</button>
-            {q.includes('@') && <button className="ac-btn" onClick={() => doInvite({ email: q })}>Invitar a {q}</button>}
+            {q.includes('@')
+              ? <button className="ac-btn" onClick={() => doInvite({ email: q.trim() })}>Invitar a {q.trim()}</button>
+              : q.trim().length >= 2 && <button className="ac-btn" onClick={() => doInvite({ nick: q.trim().replace(/^@/, '') })}>Invitar a @{q.trim().replace(/^@/, '')}</button>}
           </div>
           {msg && <p className="set-note" style={{ marginTop: 10 }}>{msg}</p>}
           {results.length > 0 && (
@@ -641,14 +653,23 @@ function InviteToTeam({ targetId }) {
   const [teams, setTeams] = useState([])
   const [msg, setMsg] = useState(null)
   useEffect(() => { listTeams().then(setTeams).catch(() => {}) }, [])
-  const invite = async (teamId) => { if (!teamId) return; await teamAdd(teamId, targetId).catch(() => {}); setMsg('Invitación enviada ✓') }
+  const [err, setErr] = useState(false)
+  const invite = async (teamId) => {
+    if (!teamId) return
+    setErr(false)
+    try { await teamAdd(teamId, targetId); setMsg('Invitación enviada ✓') }
+    catch { setErr(true) }
+  }
   if (msg) return <span className="ac-btn" style={{ ...ghost, cursor: 'default' }}>{msg}</span>
   if (!teams.length) return null
   return (
-    <select className="ac-input" style={{ padding: '7px 10px', fontSize: 12.5, maxWidth: 200 }} defaultValue="" onChange={e => invite(e.target.value)}>
-      <option value="">Invitar a un equipo…</option>
-      {teams.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
-    </select>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <select className="ac-input" style={{ padding: '7px 10px', fontSize: 12.5, maxWidth: 200 }} defaultValue="" onChange={e => invite(e.target.value)}>
+        <option value="">Invitar a un equipo…</option>
+        {teams.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
+      </select>
+      {err && <span style={{ fontSize: 11.5, color: 'var(--apex-danger, #e0746a)' }}>No se pudo enviar</span>}
+    </span>
   )
 }
 
