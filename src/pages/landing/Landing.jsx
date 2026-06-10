@@ -1,29 +1,16 @@
-import { useState } from 'react'
-import { useApexTheme } from '../../shell/ThemeContext'
 import AtmosphericCanvas from '../../shell/AtmosphericCanvas'
-import { signInWithGoogle, signInDemo, signInClient } from '../../lib/auth'
+import { signInWithGoogle, signInDemo } from '../../lib/auth'
 
 /*
- * Landing pública — puerta de entrada. Cualquiera entra con Google (o modo demo
- * en local). Marca = logo Apex, sin nombre de producto.
+ * Landing pública — puerta de entrada. Closers y clientes entran con Google; el
+ * acceso (y el rol) lo da el admin. Estética Apex Neón (verde sobre negro).
  */
 export default function Landing() {
-  const { theme } = useApexTheme()
-  const [clientMode, setClientMode] = useState(false)
-  const [email, setEmail] = useState('')
-  const [pw, setPw] = useState('')
-  const [err, setErr] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const doClientLogin = async (e) => {
-    e.preventDefault(); setErr(null); setBusy(true)
-    try { await signInClient(email.trim(), pw) }
-    catch { setErr('Email o contraseña incorrectos.'); setBusy(false) }
-  }
   return (
-    <div className="apex-ops lp" data-theme={theme}>
+    <div className="apex-ops lp" data-theme="neon">
       <AtmosphericCanvas />
       <div className="lp-wrap">
-        <img className="lp-logo" src="/apex-mark-platinum.svg" alt="Apex" width={56} height={56} />
+        <img className="lp-logo" src="/apex-mark.svg" alt="Apex" width={56} height={56} />
 
         <h1 className="lp-title">El sistema operativo del closer</h1>
         <p className="lp-sub">
@@ -32,25 +19,11 @@ export default function Landing() {
         </p>
 
         <div className="lp-cta">
-          {!clientMode ? (
-            <>
-              <button className="lp-google" onClick={signInWithGoogle}>
-                <GoogleIcon />
-                Entrar con Google
-              </button>
-              <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>
-              <button className="lp-link" onClick={() => setClientMode(true)}>¿Eres una empresa? Acceso clientes →</button>
-            </>
-          ) : (
-            <form className="lp-form" onSubmit={doClientLogin}>
-              <div className="lp-form-h">Acceso clientes</div>
-              <input className="lp-input" type="email" placeholder="Email de tu cuenta" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" />
-              <input className="lp-input" type="password" placeholder="Contraseña" value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" />
-              {err && <div className="lp-err">{err}</div>}
-              <button className="lp-google" type="submit" disabled={busy || !email || !pw}>{busy ? 'Entrando…' : 'Entrar'}</button>
-              <button className="lp-link" type="button" onClick={() => { setClientMode(false); setErr(null) }}>← Soy closer</button>
-            </form>
-          )}
+          <button className="lp-google" onClick={signInWithGoogle}>
+            <GoogleIcon />
+            Entrar con Google
+          </button>
+          <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>
         </div>
 
         <ul className="lp-points">

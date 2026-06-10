@@ -55,8 +55,11 @@ export default async function handler(req, res) {
       case 'google-callback': return googleCallback(req, res)
       case 'me':              return me(req, res)
       case 'integrations':    return integrations(req, res)
-      case 'client-login':    return clientLogin(req, res)
-      case 'create-client':   return createClientAccount(req, res)
+      case 'client-login':    return passwordLogin(req, res)
+      case 'password-login':  return passwordLogin(req, res)
+      case 'admin-login':     return passwordLogin(req, res)
+      case 'create-client':   return createAccount(req, res)
+      case 'create-account':  return createAccount(req, res)
       case 'logout':          return logout(req, res)
       default:                return res.status(400).json({ error: `unknown_action: ${action}` })
     }
@@ -160,38 +163,44 @@ async function me(req, res) {
   const { data: sess } = await supabase.from('sessions').select('user_id, expires_at').eq('token', token).maybeSingle()
   if (!sess) return res.status(401).json({ error: 'invalid_session' })
   if (sess.expires_at && new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'expired' })
-  const { data: user } = await supabase.from('users').select('id, email, name, picture, account_type').eq('id', sess.user_id).maybeSingle()
+  const { data: user } = await supabase.from('users').select('id, email, name, picture, account_type, access').eq('id', sess.user_id).maybeSingle()
   if (!user) return res.status(401).json({ error: 'user_not_found' })
   return res.status(200).json({ user })
 }
 
-// Login de cuenta de CLIENTE (email + contraseña). Solo cuentas account_type=client.
-async function clientLogin(req, res) {
+// Login por EMAIL + CONTRASEÑA (lo usa el ADMIN en /admin). Genérico: vale para
+// cualquier cuenta con contraseña. La autorización fina (¿es admin?) la hace cada
+// endpoint protegido. Bloqueados no entran.
+async function passwordLogin(req, res) {
   const { email, password } = req.body || {}
   if (!email || !password) return res.status(400).json({ error: 'email_and_password_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
-  const { data: u } = await supabase.from('users').select('id, email, name, picture, account_type, password_hash').ilike('email', String(email).trim()).maybeSingle()
-  if (!u || u.account_type !== 'client' || !verifyPassword(password, u.password_hash)) return res.status(401).json({ error: 'invalid_credentials' })
+  const { data: u } = await supabase.from('users').select('id, email, name, picture, account_type, access, password_hash').ilike('email', String(email).trim()).maybeSingle()
+  if (!u || !u.password_hash || !verifyPassword(password, u.password_hash)) return res.status(401).json({ error: 'invalid_credentials' })
+  if (u.access === 'blocked') return res.status(403).json({ error: 'blocked' })
   const token = crypto.randomBytes(24).toString('hex')
   await supabase.from('sessions').insert({ token, user_id: u.id, expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString() })
-  return res.status(200).json({ token, user: { id: u.id, email: u.email, name: u.name, picture: u.picture, account_type: u.account_type } })
+  return res.status(200).json({ token, user: { id: u.id, email: u.email, name: u.name, picture: u.picture, account_type: u.account_type, access: u.access } })
 }
 
-// Provisión de una cuenta de CLIENTE (la creamos NOSOTROS). Protegida por un
-// secreto admin (env APEX_ADMIN_SECRET). El email debe ser real (es el login).
-async function createClientAccount(req, res) {
-  const { secret, email, password, name } = req.body || {}
+// Provisión de una cuenta (la creamos NOSOTROS). Protegida por secreto admin
+// (env APEX_ADMIN_SECRET). Sirve para el ADMIN (account_type=admin) o cuentas con
+// contraseña. account_type y access configurables (default client/approved).
+async function createAccount(req, res) {
+  const { secret, email, password, name, account_type = 'client', access = 'approved' } = req.body || {}
   if (!process.env.APEX_ADMIN_SECRET || secret !== process.env.APEX_ADMIN_SECRET) return res.status(403).json({ error: 'forbidden' })
   if (!email || !password) return res.status(400).json({ error: 'email_and_password_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const password_hash = hashPassword(password)
+  const type = ['admin', 'client', 'closer'].includes(account_type) ? account_type : 'client'
+  const acc = ['pending', 'approved', 'blocked'].includes(access) ? access : 'approved'
   const { data: existing } = await supabase.from('users').select('id').ilike('email', String(email).trim()).maybeSingle()
   let id
   if (existing) {
-    await supabase.from('users').update({ account_type: 'client', password_hash, ...(name ? { name } : {}) }).eq('id', existing.id)
+    await supabase.from('users').update({ account_type: type, access: acc, password_hash, ...(name ? { name } : {}) }).eq('id', existing.id)
     id = existing.id
   } else {
-    const { data: u, error } = await supabase.from('users').insert({ email: String(email).trim(), name: name || null, account_type: 'client', password_hash }).select('id').single()
+    const { data: u, error } = await supabase.from('users').insert({ email: String(email).trim(), name: name || null, account_type: type, access: acc, password_hash }).select('id').single()
     if (error) return res.status(500).json({ error: error.message })
     id = u.id
   }
