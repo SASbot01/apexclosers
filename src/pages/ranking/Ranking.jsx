@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
+import AvailabilityDot from '../../components/AvailabilityDot'
 import { getRanking } from '../../lib/workflowApi'
 
 /*
@@ -47,7 +48,7 @@ export default function Ranking() {
             <button key={r.user_id} type="button" className="apex-card rk-row" data-top={r.rank <= 3 || undefined} onClick={() => navigate(`/perfil/${r.user_id}`)}>
               <span className="rk-pos">{medal(r.rank)}</span>
               <span className="rk-av">{r.photo_url ? <img src={r.photo_url} alt="" /> : <span>{initials(r.name)}</span>}</span>
-              <span className="rk-id"><span className="rk-name">{r.name}</span>{r.nickname && <span className="rk-nick">@{r.nickname}</span>}</span>
+              <span className="rk-id"><span className="rk-name">{r.name}</span>{r.nickname && <span className="rk-nick">@{r.nickname}</span>}<span style={{ marginTop: 2 }}><AvailabilityDot status={r.status} /></span></span>
               <span className="rk-deals">{r.deals} cierres</span>
               <span className="rk-rev">{money(r.revenue)}</span>
             </button>

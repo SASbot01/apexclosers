@@ -60,6 +60,11 @@ export async function createBot({ meetingUrl, botName = "Apex's Notetaker", join
           },
         }),
         video_mixed_layout: 'speaker_view',
+        // Eventos de participante (speaker timeline): metadato GRATIS (detección
+        // de quién habla, sin coste de transcripción). Lo cruzamos con los
+        // segmentos de Whisper para poner el nombre del Closer y del Cliente
+        // en la transcripción en vez de "Cliente" para todo. Ver assignSpeakers.
+        participant_events: {},
       },
       ...(metadata ? { metadata } : {}),
     }),

@@ -373,6 +373,18 @@ async function getCall(req, res) {
   if (userId) q = q.eq('user_id', userId)   // aislamiento por usuario
   const { data } = await q.maybeSingle()
   if (!data) return res.status(404).json({ error: 'not_found' })
+  // La URL de grabación de Recall es PREFIRMADA y CADUCA: la refrescamos bajo
+  // demanda al abrir el detalle para que el vídeo siempre se vea (antes se
+  // guardaba una URL que expiraba → vídeo en blanco).
+  if (data.bot_id && data.status === 'done' && recallReady()) {
+    try {
+      const fresh = await getRecordingUrl(data.bot_id)
+      if (fresh && fresh !== data.recording_url) {
+        data.recording_url = fresh
+        supabase.from('calls').update({ recording_url: fresh }).eq('id', data.id).then(() => {}, () => {})
+      }
+    } catch { /* deja la url que haya */ }
+  }
   return res.status(200).json(data)
 }
 

@@ -39,19 +39,33 @@ export default async function handler(req, res) {
   }
 }
 
-export async function computeUserMetrics(userId) {
+// Si se pasa clientKey, las métricas se FILTRAN a ese cliente: las ventas por
+// client_id; las de llamadas (show/close rate, pipeline) no se pueden filtrar por
+// cliente (las calls no llevan esa clave) → se devuelven null en la vista filtrada.
+export async function computeUserMetrics(userId, clientKey = null) {
   if (!supabaseReady() || !userId) return null
   const since = new Date(Date.now() - 365 * 86400 * 1000).toISOString()
-  const [salesRes, callsRes, leadsRes] = await Promise.all([
-    supabase.from('sales').select('revenue, cash_collected, status').eq('owner_id', userId).eq('status', 'verified').limit(5000),
-    supabase.from('calls').select('status, outcome, offer_made, deal_closed').eq('user_id', userId).or(`started_at.gte.${since},started_at.is.null`).limit(5000),
-    supabase.from('leads').select('stage, value').eq('owner_id', userId).limit(5000),
-  ])
-  const S = salesRes.data || [], C = callsRes.data || [], L = leadsRes.data || []
-
+  let salesQ = supabase.from('sales').select('revenue, cash_collected, status').eq('owner_id', userId).eq('status', 'verified')
+  if (clientKey) salesQ = salesQ.eq('client_id', clientKey)
+  const S = (await salesQ.limit(5000)).data || []
   const revenue = S.reduce((a, s) => a + (Number(s.revenue) || 0), 0)
   const cash    = S.reduce((a, s) => a + (Number(s.cash_collected) || 0), 0)
   const deals   = S.length
+
+  // Vista filtrada a un cliente: solo métricas de ventas (revenue/cash/cierres).
+  if (clientKey) {
+    return {
+      revenue, cash_collected: cash, recollected: revenue ? cash / revenue : null,
+      deals, avg_ticket: deals ? revenue / deals : 0,
+      calls: null, held: null, show_rate: null, offers: null, close_rate: null, pipeline_value: null,
+    }
+  }
+
+  const [callsRes, leadsRes] = await Promise.all([
+    supabase.from('calls').select('status, outcome, offer_made, deal_closed').eq('user_id', userId).or(`started_at.gte.${since},started_at.is.null`).limit(5000),
+    supabase.from('leads').select('stage, value').eq('owner_id', userId).limit(5000),
+  ])
+  const C = callsRes.data || [], L = leadsRes.data || []
 
   const held    = C.filter(c => c.status === 'done' || ['won', 'lost', 'follow_up'].includes(c.outcome)).length
   const noShow  = C.filter(c => c.outcome === 'no_show').length
@@ -85,7 +99,8 @@ async function getMetrics(req, res) {
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const isOwner = viewerId === userId
-  const [metrics, visible] = await Promise.all([computeUserMetrics(userId), visibilityMap(userId)])
+  const client = req.query.client || null
+  const [metrics, visible] = await Promise.all([computeUserMetrics(userId, client), visibilityMap(userId)])
   const list = METRIC_DEFS
     .filter(d => isOwner || visible[d.key] === true)   // a terceros, solo públicas
     .map(d => ({ ...d, value: metrics ? metrics[d.key] : null, public: visible[d.key] === true }))

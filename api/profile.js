@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     if (action === 'get')          return getProfile(req, res)
     if (action === 'by-nick')      return getByNick(req, res)
     if (action === 'update')       return updateProfile(req, res)
+    if (action === 'set-status')   return setStatus(req, res)
     if (action === 'upload-photo') return uploadPhoto(req, res)
     if (action === 'search')       return search(req, res)
     if (action === 'cv')           return cv(req, res)
@@ -44,19 +45,33 @@ async function loadProfile(userId) {
     photo_url: prof?.photo_url || user?.picture || null,
     links: Array.isArray(prof?.links) ? prof.links : [],
     location: prof?.location || null,
+    status: prof?.status || 'available',   // disponible | busy | inactive
     email: user?.email || null,
   }
 }
 
-// Métricas visibles para quien mira (públicas si es un tercero).
-async function publicMetricsFor(userId, viewerId) {
+// Métricas visibles para quien mira. Si client≠null y el viewer está autorizado
+// (dueño o miembro del equipo de ese cliente), se ven TODAS filtradas a ese
+// cliente; si es un tercero sin acceso, solo las marcadas como públicas.
+async function publicMetricsFor(userId, viewerId, client = null, scopedAuthorized = false) {
   const isOwner = viewerId === userId
+  const showAll = isOwner || scopedAuthorized
   const { data: vis } = await supabase.from('metric_visibility').select('visible').eq('user_id', userId).maybeSingle()
   const visible = (vis && vis.visible) || {}
-  const metrics = await computeUserMetrics(userId)
+  const metrics = await computeUserMetrics(userId, client)
   return METRIC_DEFS
-    .filter(d => isOwner || visible[d.key] === true)
+    .filter(d => showAll || visible[d.key] === true)
     .map(d => ({ ...d, value: metrics ? metrics[d.key] : null, public: visible[d.key] === true }))
+}
+
+// ¿viewerId es miembro de algún equipo de userId sobre ese cliente?
+async function isTeamMember(ownerId, viewerId, clientKey) {
+  if (!ownerId || !viewerId || !clientKey) return false
+  const { data: teams } = await supabase.from('teams').select('id').eq('owner_id', ownerId).eq('client_key', clientKey)
+  const ids = (teams || []).map(t => t.id)
+  if (!ids.length) return false
+  const { data } = await supabase.from('team_members').select('team_id').eq('user_id', viewerId).in('team_id', ids).limit(1)
+  return !!(data && data.length)
 }
 
 async function friendshipBetween(a, b) {
@@ -68,21 +83,35 @@ async function friendshipBetween(a, b) {
   return data || null
 }
 
-async function respondProfile(res, userId, viewerId) {
+// "En racha" = tiene al menos una venta verificada en los últimos 30 días.
+async function recentStreak(userId) {
+  if (!supabaseReady()) return false
+  const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString()
+  const { count } = await supabase.from('sales').select('id', { count: 'exact', head: true })
+    .eq('owner_id', userId).eq('status', 'verified').gte('date', since)
+  return (count || 0) > 0
+}
+
+async function respondProfile(res, userId, viewerId, client = null) {
   const isOwner = (viewerId || userId) === userId
-  const [profile, metrics, friendship] = await Promise.all([
+  // Acceso a la vista filtrada por cliente: dueño o miembro del equipo de ese cliente.
+  let scopedAuthorized = false
+  if (client && !isOwner) scopedAuthorized = await isTeamMember(userId, viewerId, client)
+  const effectiveClient = (client && (isOwner || scopedAuthorized)) ? client : null
+  const [profile, metrics, friendship, streak] = await Promise.all([
     loadProfile(userId),
-    publicMetricsFor(userId, viewerId || userId),
+    publicMetricsFor(userId, viewerId || userId, effectiveClient, scopedAuthorized),
     isOwner ? Promise.resolve(null) : friendshipBetween(userId, viewerId),
+    recentStreak(userId),
   ])
-  return res.status(200).json({ profile, metrics, isOwner, friendship })
+  return res.status(200).json({ profile, metrics, isOwner, friendship, scopedClient: effectiveClient, streak })
 }
 
 async function getProfile(req, res) {
   const userId = req.query.userId
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
-  return respondProfile(res, userId, req.query.viewerId)
+  return respondProfile(res, userId, req.query.viewerId, req.query.client || null)
 }
 
 async function getByNick(req, res) {
@@ -91,7 +120,7 @@ async function getByNick(req, res) {
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const { data } = await supabase.from('profiles').select('user_id').ilike('nickname', nick).maybeSingle()
   if (!data) return res.status(404).json({ error: 'not_found' })
-  return respondProfile(res, data.user_id, req.query.viewerId)
+  return respondProfile(res, data.user_id, req.query.viewerId, req.query.client || null)
 }
 
 async function updateProfile(req, res) {
@@ -112,11 +141,22 @@ async function updateProfile(req, res) {
     bio: profile.bio ?? null,
     location: profile.location ?? null,
     links: Array.isArray(profile.links) ? profile.links.filter(l => l && l.url).map(l => ({ label: String(l.label || l.url), url: String(l.url) })) : [],
+    ...(['available', 'busy', 'inactive'].includes(profile.status) ? { status: profile.status } : {}),
     updated_at: new Date().toISOString(),
   }
   const { error } = await supabase.from('profiles').upsert(row, { onConflict: 'user_id' })
   if (error) return res.status(500).json({ error: error.message })
   return res.status(200).json({ ok: true, profile: await loadProfile(userId) })
+}
+
+// Cambio rápido del estado de disponibilidad (sin reescribir el resto del perfil).
+async function setStatus(req, res) {
+  const { userId, status } = req.body || {}
+  if (!userId || !['available', 'busy', 'inactive'].includes(status)) return res.status(400).json({ error: 'userId_and_valid_status_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { error } = await supabase.from('profiles').upsert({ user_id: userId, status, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+  if (error) return res.status(500).json({ error: error.message })
+  return res.status(200).json({ ok: true, status })
 }
 
 async function uploadPhoto(req, res) {
@@ -152,13 +192,13 @@ async function search(req, res) {
   if (!q) return res.status(200).json({ results: [] })
   const like = `%${q}%`
   const [{ data: profs }, { data: users }] = await Promise.all([
-    supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url')
+    supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url, status')
       .or(`nickname.ilike.${like},display_name.ilike.${like}`).limit(25),
     supabase.from('users').select('id, name, email, picture')
       .or(`name.ilike.${like},email.ilike.${like}`).limit(25),
   ])
   const byId = new Map()
-  for (const p of (profs || [])) byId.set(p.user_id, { user_id: p.user_id, nickname: p.nickname, display_name: p.display_name, headline: p.headline, photo_url: p.photo_url })
+  for (const p of (profs || [])) byId.set(p.user_id, { user_id: p.user_id, nickname: p.nickname, display_name: p.display_name, headline: p.headline, photo_url: p.photo_url, status: p.status || 'available' })
   for (const u of (users || [])) {
     const ex = byId.get(u.id) || { user_id: u.id, nickname: null, headline: null }
     ex.display_name = ex.display_name || u.name || (u.email ? u.email.split('@')[0] : 'Closer')
@@ -167,6 +207,19 @@ async function search(req, res) {
   }
   let results = [...byId.values()]
   if (viewerId) results = results.filter(r => r.user_id !== viewerId)   // no te listes a ti
+  // Estado de relación con quien busca: friends | pending_out | pending_in | null
+  // (para que el botón muestre "Pendiente"/"Aceptar"/"Amigo" en vez de "Invitar").
+  if (viewerId && results.length) {
+    const { data: rels } = await supabase.from('friendships')
+      .select('requester_id, addressee_id, status')
+      .or(`requester_id.eq.${viewerId},addressee_id.eq.${viewerId}`)
+    const byOther = new Map()
+    for (const r of (rels || [])) {
+      const other = r.requester_id === viewerId ? r.addressee_id : r.requester_id
+      byOther.set(other, r.status === 'accepted' ? 'friends' : (r.requester_id === viewerId ? 'pending_out' : 'pending_in'))
+    }
+    results = results.map(r => ({ ...r, relation: byOther.get(r.user_id) || null }))
+  }
   return res.status(200).json({ results: results.slice(0, 25) })
 }
 

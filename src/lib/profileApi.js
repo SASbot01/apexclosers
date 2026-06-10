@@ -34,6 +34,7 @@ export const getProfile    = (client) => req('/api/profile', 'get', { query: { u
 export const getProfileById = (userId, client) => req('/api/profile', 'get', { query: { userId, viewerId: getUserId(), ...(client ? { client } : {}) } })
 export const updateProfile = (profile)  => req('/api/profile', 'update', { method: 'POST', body: { userId: getUserId(), profile } })
 export const uploadPhoto   = (photo, filename) => req('/api/profile', 'upload-photo', { method: 'POST', body: { userId: getUserId(), photo, filename } })
+export const setProfileStatus = (status) => req('/api/profile', 'set-status', { method: 'POST', body: { userId: getUserId(), status } })
 export const searchProfiles = (q)       => req('/api/profile', 'search', { query: { q, viewerId: getUserId() } }).then(d => d.results || [])
 export const getCV         = (userId)   => req('/api/profile', 'cv', { query: { userId: userId || getUserId(), viewerId: getUserId() } }).then(d => d.cv)
 

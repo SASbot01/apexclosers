@@ -607,9 +607,14 @@ const WS_CSS = `
   .ws-bn-head { flex-wrap: wrap; }
   .ws-bn-score { text-align: left; }
   .ws-bn-area { font-size: 21px; }
-  .ws-chat { grid-template-columns: 1fr; }
+  /* Chat IA: en móvil pasa a columna (lista arriba, conversación abajo) con el
+     cuerpo desplazable, para que el campo de escribir NO se corte abajo. */
+  .ws-chat { display: flex; flex-direction: column; min-height: 0; }
   .ws-chat-list { border-right: 0; border-bottom: 1px solid var(--apex-alpha-3); }
   .ws-chat-threads { flex-direction: row; overflow-x: auto; }
   .ws-chat-item { min-width: 160px; border-bottom: 0; border-right: 1px solid var(--apex-alpha-3); }
+  .ws-chat-main { flex: 1; min-height: 0; }
+  .ws-chat-body { max-height: 50vh; }
+  .ws-chat-input { font-size: 16px; }   /* evita el zoom de iOS al enfocar */
 }
 `

@@ -126,6 +126,14 @@
 .pl-next-label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--apex-plat-low); margin-bottom: 2px; }
 .pl-col-empty { font-size: 12px; color: var(--apex-plat-shad); padding: 8px 2px; }
 .pl-dot { display: none; }  /* status dot: visible solo en tema neón (ver ApexTheme.css §14) */
+/* Drag-and-drop del Kanban (arrastrar tarjetas entre columnas) */
+.pl-card[draggable] { cursor: grab; }
+.pl-card[draggable]:active { cursor: grabbing; }
+.pl-card[data-dragging] { opacity: 0.4; }
+.pl-col { padding: 4px; transition: background 0.15s, box-shadow 0.15s; border-radius: var(--apex-radius, 10px); }
+.pl-col[data-over] { background: var(--apex-accent-soft, var(--apex-alpha-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--apex-accent, var(--apex-plat-mid)) 55%, transparent); }
+.pl-col[data-over] .pl-col-empty { color: var(--apex-accent, var(--apex-plat-mid)); }
+.pl-col-body { min-height: 60px; }   /* zona soltable aunque la columna esté vacía */
 
 /* ── Ajustes ── */
 .set-card { padding: 22px 24px; }
@@ -367,4 +375,13 @@ button.lead-tag { cursor: pointer; font-family: var(--apex-font); }
   .seq-step { grid-template-columns: 1fr 1fr; padding-right: 34px; }
   .seq-step > :nth-child(4) { grid-column: 1 / -1; }
   .seq-step > :last-child { position: absolute; top: 8px; right: 8px; }
+  /* Formulario "Grabar llamada": los campos se apilan a ancho completo (no se cortan) */
+  .ac-start { flex-wrap: wrap; }
+  .ac-start .ac-input { flex: 1 1 100% !important; }
+  .ac-start .ac-btn { flex: 1 1 100%; }
+  /* Cualquier nav de pestañas (perfil: Amigos/Grupos/Equipo · etc.) scrollea
+     en horizontal en vez de salirse de la pantalla */
+  .seg { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .seg::-webkit-scrollbar { height: 0; }
+  .seg-btn { white-space: nowrap; flex: 0 0 auto; }
 }

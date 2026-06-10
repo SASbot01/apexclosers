@@ -119,7 +119,7 @@ async function summary(req, res) {
 
   // Llamadas del periodo (incluye started_at NULL, como en métricas).
   let cq = supabase.from('calls')
-    .select('id, started_at, outcome, state, objections, offer_made, deal_closed, deal_amount, skills, transcript, client_id')
+    .select('id, started_at, status, outcome, state, objections, offer_made, deposit_collected, deal_closed, deal_amount, skills, transcript, client_id')
     .eq('user_id', userId)
   if (client !== 'all') cq = cq.eq('client_id', client)
   if (startIso) cq = cq.or(`started_at.gte.${startIso},started_at.is.null`)
@@ -133,6 +133,10 @@ async function summary(req, res) {
   const { data: salesRaw } = await sq.limit(5000)
   const sales = salesRaw || []
 
+  // Leads abiertos (para el eje de Seguimiento del hexagrama).
+  const { data: leadsRaw } = await supabase.from('leads').select('stage, last_at, client_id').eq('owner_id', userId).limit(5000)
+  const leads = (leadsRaw || []).filter(l => client === 'all' || l.client_id === client)
+
   // Puntúa de forma PEREZOSA las llamadas con transcripción pero sin skills.
   const toScore = calls.filter(c => !c.skills && Array.isArray(c.transcript) && c.transcript.length)
   let scoredNow = 0
@@ -145,11 +149,31 @@ async function summary(req, res) {
 
   const withSkills = calls.filter(c => c.skills && typeof c.skills === 'object')
 
-  // Hexagrama: media de cada habilidad sobre las llamadas puntuadas.
-  const skills = SKILL_KEYS.map(k => ({
-    key: k, label: SKILL_LABEL[k],
-    value: round2(avg(withSkills.map(c => Number(c.skills[k]) || 0))) || 0,
-  }))
+  // ── Hexagrama de habilidades DERIVADO DEL EMBUDO REAL (no inventado) ──────
+  // Cada eje sale de los datos: llamadas, ofertas, cierres, objeciones, ventas y
+  // leads. Así los % se mueven con tu rendimiento real.
+  const clampR = (a, b) => b > 0 ? Math.max(0, Math.min(1, a / b)) : null
+  const heldC    = calls.filter(c => c.status === 'done' || ['won', 'lost', 'follow_up'].includes(c.outcome) || c.offer_made || c.deal_closed).length
+  const noShowC  = calls.filter(c => c.state === 'no_show' || c.outcome === 'no_show').length
+  const offersC  = calls.filter(c => c.offer_made).length
+  const depositsC = calls.filter(c => c.deposit_collected).length
+  const wonC     = calls.filter(c => c.outcome === 'won' || c.deal_closed).length
+  const objCalls = calls.filter(c => Array.isArray(c.objections) && c.objections.length)
+  const wonObjC  = objCalls.filter(c => c.outcome === 'won' || c.deal_closed).length
+  const openLeads  = leads.filter(l => l.stage !== 'cerrado')
+  const staleLeads = openLeads.filter(l => !l.last_at || (Date.now() - new Date(l.last_at).getTime()) > 7 * 86400 * 1000)
+  // apertura=show rate · descubrimiento=tasa de oferta · propuesta=compromiso
+  // (cierres+depósitos / ofertas) · objeciones=cierre con objeción · cierre=close
+  // rate · seguimiento=salud del pipeline (leads no estancados).
+  const SKILL_FROM = {
+    apertura:      clampR(heldC, heldC + noShowC),
+    descubrimiento: clampR(offersC, heldC),
+    propuesta:     clampR(wonC + depositsC, offersC),
+    objeciones:    objCalls.length ? clampR(wonObjC, objCalls.length) : clampR(wonC, offersC),
+    cierre:        clampR(wonC, offersC),
+    seguimiento:   openLeads.length ? clampR(openLeads.length - staleLeads.length, openLeads.length) : null,
+  }
+  const skills = SKILL_KEYS.map(k => ({ key: k, label: SKILL_LABEL[k], value: round2(SKILL_FROM[k] ?? 0) }))
   const byKey = Object.fromEntries(skills.map(s => [s.key, s.value]))
   const strong = skills.reduce((a, s) => s.value > a.value ? s : a, skills[0])
   const weak = skills.reduce((a, s) => s.value < a.value ? s : a, skills[0])
@@ -171,8 +195,12 @@ async function summary(req, res) {
   // Volumen.
   const callsN = calls.length
   const words = withSkills.reduce((a, c) => a + (Number(c.skills.words) || 0), 0)
-  const minutes = withSkills.reduce((a, c) => a + (Number(c.skills.minutes) || 0), 0)
-  const hours = Math.round(minutes / 60)
+  // Minutos: de las marcas de tiempo del transcript; si faltan (transcripciones
+  // sin timestamps), se estiman por volumen de palabras (~130 wpm) para que las
+  // "horas transcritas" no salgan a 0.
+  let minutes = withSkills.reduce((a, c) => a + (Number(c.skills.minutes) || 0), 0)
+  if (minutes < 1 && words > 0) minutes = words / 130
+  const hours = Math.max(words > 0 ? 1 : 0, Math.round(minutes / 60))
   const questions = withSkills.length ? round2(avg(withSkills.map(c => Number(c.skills.questions) || 0))) : 0
 
   // Objeción más frecuente.

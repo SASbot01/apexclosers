@@ -4,6 +4,7 @@ import { Check, Copy, CreditCard, Calendar, Mic, Webhook, Users, TrendingUp, Wal
 import FloatingHeader from '../../components/FloatingHeader'
 import { useCurrentUser, signOut } from '../../lib/auth'
 import { getMetrics, getVisibility, setVisibility as apiSetVisibility } from '../../lib/salesApi'
+import { API_BASE } from '../../lib/config'
 
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
@@ -160,56 +161,75 @@ const INTEGRATIONS = [
   { key: 'api', Icon: Webhook, name: 'API y Webhooks', desc: 'Conecta Apex con n8n, Zapier o tu propio backend.', status: 'disconnected', cta: 'Generar API key' },
 ]
 function IntegrationsTab() {
+  const user = useCurrentUser() || {}
+  const [live, setLive] = useState({})
+  useEffect(() => {
+    if (!user.id) return
+    fetch(`${API_BASE}/api/auth?action=integrations&userId=${encodeURIComponent(user.id)}`)
+      .then(r => r.json()).then(setLive).catch(() => {})
+  }, [user.id])
+  // Estado real: Google Calendar conectado si el usuario tiene tokens de Google
+  // (hizo login con Google, que ya incluye el scope de Calendar); Recall según la
+  // API key del backend. CRM/API quedan como manuales por ahora.
+  const statusOf = (it) => {
+    if (it.key === 'gcal') return live.google ? 'connected' : 'disconnected'
+    if (it.key === 'recall') return live.recall ? 'connected' : it.status
+    return it.status
+  }
   return (
     <>
       <p className="set-note" style={{ margin: '0 0 14px' }}>Conecta tus herramientas. El Notetaker es el núcleo: graba y transcribe tus llamadas para que la IA genere tus datos de rendimiento.</p>
       <div className="set-integrations">
-        {INTEGRATIONS.map(it => (
+        {INTEGRATIONS.map(it => {
+          const st = statusOf(it)
+          return (
           <div className="apex-card set-int" key={it.key}>
             <span className="set-int-ic"><it.Icon size={20} strokeWidth={1.7} /></span>
             <div className="set-int-body">
               <div className="set-int-top">
                 <span className="set-int-name">{it.name}</span>
-                <span className="set-badge" data-tone={it.status === 'connected' ? 'pos' : 'idle'}>{it.status === 'connected' ? 'Conectado' : 'Sin conectar'}</span>
+                <span className="set-badge" data-tone={st === 'connected' ? 'pos' : 'idle'}>{st === 'connected' ? 'Conectado' : 'Sin conectar'}</span>
               </div>
-              <p className="set-int-desc">{it.desc}</p>
+              <p className="set-int-desc">{it.key === 'gcal' && st === 'connected' ? 'Conectado con tu cuenta de Google — el Notetaker entra solo a tus llamadas de venta agendadas.' : it.desc}</p>
             </div>
-            <button className="set-btn" disabled={it.status !== 'connected' && it.key !== 'recall'}>{it.status === 'connected' ? it.cta : it.cta}</button>
+            <button className="set-btn" disabled={st !== 'connected' && it.key !== 'recall' && it.key !== 'gcal'}>{st === 'connected' ? 'Gestionar' : it.cta}</button>
           </div>
-        ))}
+          )
+        })}
       </div>
-      <p className="set-note">Las conexiones reales (OAuth de Google, API keys) se activan con el backend desplegado.</p>
+      <p className="set-note">Google Calendar se conecta solo al iniciar sesión con Google. CRM y API/Webhooks se activan próximamente.</p>
     </>
   )
 }
 
 // ── Afiliados ─────────────────────────────────────────────────────────────────
-const REFERRALS = [
-  { name: 'Diego Navarro', date: '02 jun 2026', plan: 'Apex Pro', status: 'active', commission: 30 },
-  { name: 'Marta Ibáñez', date: '21 may 2026', plan: 'Apex Pro', status: 'active', commission: 30 },
-  { name: 'Carlos Ruano', date: '14 may 2026', plan: 'Apex Starter', status: 'active', commission: 15 },
-  { name: 'Lead frío', date: '03 may 2026', plan: '—', status: 'pending', commission: 0 },
-]
+const fmtRefDay = (iso) => { try { return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }) } catch { return iso } }
 function AffiliatesTab() {
   const user = useCurrentUser() || {}
-  const refCode = (user.email?.split('@')[0]) || 'alex_closer'
-  const link = `https://apex-closer.app/?ref=${refCode}`
+  // El link lleva tu user_id como ?ref=; al registrarse alguien con él, queda
+  // anotado como tu referido (api/auth.js). Apunta al origen real de la app.
+  const link = `${window.location.origin}/?ref=${user.id || ''}`
   const [copied, setCopied] = useState(false)
+  const [data, setData] = useState({ referrals: [], stats: { count: 0, active: 0 } })
+  useEffect(() => {
+    if (!user.id) return
+    fetch(`${API_BASE}/api/affiliates?action=summary&userId=${encodeURIComponent(user.id)}`)
+      .then(r => r.json()).then(setData).catch(() => {})
+  }, [user.id])
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* off */ }
   }
   const stats = [
-    { Icon: Users, label: 'Referidos', value: intf(12) },
-    { Icon: TrendingUp, label: 'Activos', value: intf(8) },
-    { Icon: Wallet, label: 'Este mes', value: money(540) },
-    { Icon: Wallet, label: 'Total ganado', value: money(3240) },
+    { Icon: Users, label: 'Referidos', value: intf(data.stats.count) },
+    { Icon: TrendingUp, label: 'Activos', value: intf(data.stats.active) },
+    { Icon: Wallet, label: 'Este mes', value: '—' },
+    { Icon: Wallet, label: 'Total ganado', value: '—' },
   ]
   return (
     <>
-      <p className="set-note" style={{ margin: '0 0 14px' }}>Vista previa · el programa de afiliados (seguimiento de referidos y pagos de comisión) se activa al conectar el proveedor de pagos. Las cifras y referidos mostrados son de ejemplo.</p>
       <div className="apex-card set-card">
         <h3>Programa de afiliados</h3>
-        <p className="set-note" style={{ margin: '0 0 14px' }}>Gana <b>30% recurrente</b> por cada closer que se suscriba con tu link (15% en plan Starter). Se paga mientras tu referido siga activo.</p>
+        <p className="set-note" style={{ margin: '0 0 14px' }}>Gana <b>20% recurrente</b> por cada closer que se suscriba con tu link, y <b>25%</b> con cuentas de comunidad (para miembros de comunidades de closers). Se paga mientras tu referido siga activo.</p>
         <label className="set-k" style={{ display: 'block', marginBottom: 6 }}>Tu link de afiliado</label>
         <div className="set-reflink">
           <input className="set-reflink-input" value={link} readOnly onFocus={e => e.target.select()} />
@@ -217,6 +237,7 @@ function AffiliatesTab() {
             {copied ? <><Check size={14} strokeWidth={2} /> Copiado</> : <><Copy size={14} strokeWidth={1.8} /> Copiar</>}
           </button>
         </div>
+        <p className="set-note" style={{ margin: '10px 0 0' }}>Comparte este link: quien se registre con él queda anotado como tu referido. El pago de comisiones se liquidará al activar la facturación.</p>
       </div>
 
       <div className="set-aff-stats">
@@ -230,23 +251,21 @@ function AffiliatesTab() {
       </div>
 
       <div className="apex-card set-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0 }}>Tus referidos</h3>
-          <button className="set-btn set-btn--accent">Solicitar pago</button>
-        </div>
-        <p className="set-note" style={{ margin: '8px 0 12px' }}>Próximo pago automático: <b>01 jul 2026</b> · método: transferencia.</p>
-        <div className="set-table set-table--aff">
-          <div className="set-tr set-tr--head"><span>Referido</span><span>Fecha</span><span>Plan</span><span className="num">Comisión</span><span>Estado</span></div>
-          {REFERRALS.map((r, i) => (
-            <div className="set-tr" key={i}>
-              <span className="set-v" style={{ textAlign: 'left' }}>{r.name}</span>
-              <span>{r.date}</span>
-              <span>{r.plan}</span>
-              <span className="num">{r.commission ? `${r.commission}%` : '—'}</span>
-              <span><span className="set-badge" data-tone={r.status === 'active' ? 'pos' : 'idle'}>{r.status === 'active' ? 'Activo' : 'Pendiente'}</span></span>
-            </div>
-          ))}
-        </div>
+        <h3 style={{ margin: '0 0 12px' }}>Tus referidos</h3>
+        {data.referrals.length === 0
+          ? <p className="ac-empty" style={{ padding: 0 }}>Aún no tienes referidos. Comparte tu link arriba.</p>
+          : <div className="set-table set-table--aff">
+              <div className="set-tr set-tr--head"><span>Referido</span><span>Fecha</span><span>Plan</span><span className="num">Comisión</span><span>Estado</span></div>
+              {data.referrals.map(r => (
+                <div className="set-tr" key={r.id}>
+                  <span className="set-v" style={{ textAlign: 'left' }}>{r.name}{r.nickname ? ` · @${r.nickname}` : ''}</span>
+                  <span>{fmtRefDay(r.date)}</span>
+                  <span>{r.plan}</span>
+                  <span className="num">{r.commission ? `${r.commission}%` : '—'}</span>
+                  <span><span className="set-badge" data-tone={r.status === 'active' ? 'pos' : 'idle'}>{r.status === 'active' ? 'Activo' : 'Inactivo'}</span></span>
+                </div>
+              ))}
+            </div>}
       </div>
     </>
   )

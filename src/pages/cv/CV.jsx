@@ -8,6 +8,7 @@ import { getRanking } from '../../lib/workflowApi'
 import { CLIENTS } from '../../data/mock/clients'
 import ProgressRing from '../../components/ProgressRing'
 import AnimatedValue from '../../components/AnimatedValue'
+import AvailabilityDot from '../../components/AvailabilityDot'
 
 /*
  * CV web — carta de presentación pública del closer, en la URL /cv/:userId.
@@ -79,6 +80,7 @@ export default function CV() {
                 <span className="cv-badge cv-badge--green"><ShieldCheck size={12} strokeWidth={2} /> Closer verificado</span>
                 {rank && <span className="cv-badge"><Trophy size={12} strokeWidth={2} /> #{rank.rank} global</span>}
                 {levelName && <span className="cv-badge">Nivel {levelName}</span>}
+                <span className="cv-badge"><AvailabilityDot status={profile.status} /></span>
               </div>
               <h1 className="cv-name">{profile.display_name || profile.nickname || 'Closer'}</h1>
               {profile.headline && <div className="cv-headline">{profile.headline}</div>}

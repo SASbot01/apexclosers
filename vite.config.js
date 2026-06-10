@@ -16,5 +16,14 @@ export default defineConfig({
     // proxy, vite serviría el CÓDIGO FUENTE de api/auth.js en vez de ejecutarlo.
     proxy: { '/api': 'http://127.0.0.1:5181' },
   },
+  // PRODUCCIÓN: `vite preview` sirve el build (dist) — un solo bundle, sin HMR ni
+  // carga de módulos sueltos. Es lo que se expone por el túnel a usuarios reales:
+  // el dev server carga decenas de módulos por petición y sobre un túnel inestable
+  // (móvil) fallaba con "Failed to fetch". Mismo puerto, proxy y allowedHosts.
+  preview: {
+    port: 5180, strictPort: true, host: true,
+    allowedHosts: true,
+    proxy: { '/api': 'http://127.0.0.1:5181' },
+  },
   build: { target: 'esnext' },
 })

@@ -70,7 +70,18 @@ const FLOATING_CSS = `
 .apex-floating-header-right { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 @media (max-width: 640px) {
   .apex-floating-header { margin: 0; top: var(--apex-topbar-h, 64px); }
-  .apex-floating-header-inner { padding: 14px 18px; }
+  /* La fila de acciones (pestañas/filtros) pasa a una segunda línea y scrollea
+     en horizontal en vez de salirse de pantalla (iPhone 15 Pro = 393px). */
+  .apex-floating-header-inner { padding: 12px 14px; flex-wrap: wrap; gap: 12px; }
   .apex-floating-header-title { font-size: 18px; }
+  .apex-floating-header-right {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+  .apex-floating-header-right::-webkit-scrollbar { height: 0; }
+  .apex-floating-header-right > * { flex: 0 0 auto; }
 }
 `

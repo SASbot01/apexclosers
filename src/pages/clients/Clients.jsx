@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import FloatingHeader from '../../components/FloatingHeader'
 import ClientLock from '../../components/ClientLock'
 import { listSales, saveSale, deleteSale as apiDeleteSale, verifySale, uploadProof, fileToDataUrl } from '../../lib/salesApi'
+import { listClients } from '../../lib/clientsApi'
 
 /*
  * Ventas — tabla de ventas EDITABLE (sustituye a la antigua lista de clientes).
@@ -22,6 +23,7 @@ const STATUS_META = {
 
 export default function Clients() {
   const [sales, setSales] = useState([])
+  const [clients, setClients] = useState([])     // clientes reales para etiquetar cada venta
   const [state, setState] = useState('loading') // loading | live | error
   const [busy, setBusy] = useState({})           // id → 'proof' | 'verify'
   const saveTimers = useRef({})
@@ -36,6 +38,8 @@ export default function Clients() {
       .catch(() => setState('error'))
   }
   useEffect(load, [])
+  useEffect(() => { listClients().then(setClients).catch(() => setClients([])) }, [])
+  const clientNameOf = (id) => clients.find(c => c.id === id)?.name || '—'
 
   // En vista bloqueada (vía equipo) solo se ven las ventas de esa cuenta.
   const visibleSales = lockedClient ? sales.filter(s => s.client_id === lockedClient) : sales
@@ -115,7 +119,7 @@ export default function Clients() {
             <table className="tbl sales-tbl">
               <thead>
                 <tr>
-                  <th>Fecha</th><th>Producto</th><th>Closer</th><th>Método</th><th>Tipo</th>
+                  <th>Fecha</th><th>Producto</th><th>Closer</th><th>Cliente</th><th>Método</th><th>Tipo</th>
                   <th className="num">Revenue</th><th className="num">Cash</th><th>Origen</th><th>Estado</th><th>Justificante</th><th></th>
                 </tr>
               </thead>
@@ -128,6 +132,13 @@ export default function Clients() {
                       <td><input className="tbl-edit" type="date" value={(s.date || '').slice(0, 10)} onChange={e => patchSale(s.id, { date: e.target.value })} /></td>
                       <td><input className="tbl-edit" value={s.product || ''} placeholder="Producto" onChange={e => patchSale(s.id, { product: e.target.value })} /></td>
                       <td><input className="tbl-edit" value={s.closer || ''} placeholder="Closer" onChange={e => patchSale(s.id, { closer: e.target.value })} /></td>
+                      <td>
+                        <select className="tbl-edit" value={s.client_id || ''} onChange={e => patchSale(s.id, { client_id: e.target.value || null })} title="Etiqueta esta venta con un cliente para las métricas por cliente/equipo">
+                          <option value="">—</option>
+                          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          {s.client_id && !clients.some(c => c.id === s.client_id) && <option value={s.client_id}>{clientNameOf(s.client_id)}</option>}
+                        </select>
+                      </td>
                       <td><input className="tbl-edit" value={s.payment_method || ''} placeholder="—" onChange={e => patchSale(s.id, { payment_method: e.target.value })} /></td>
                       <td>
                         <select className="tbl-edit" value={s.payment_type || 'Pago único'} onChange={e => patchSale(s.id, { payment_type: e.target.value })}>
@@ -163,8 +174,8 @@ export default function Clients() {
                     </tr>
                   )
                 })}
-                {state === 'live' && visibleSales.length === 0 && <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>{lockedClient ? 'Sin ventas en esta cuenta.' : 'Sin ventas todavía. Pulsa “+ Venta” o cierra una en una llamada.'}</td></tr>}
-                {state === 'loading' && <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>Cargando…</td></tr>}
+                {state === 'live' && visibleSales.length === 0 && <tr><td colSpan={12} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>{lockedClient ? 'Sin ventas en esta cuenta.' : 'Sin ventas todavía. Pulsa “+ Venta” o cierra una en una llamada.'}</td></tr>}
+                {state === 'loading' && <tr><td colSpan={12} style={{ textAlign: 'center', color: 'var(--apex-plat-low)', padding: 24 }}>Cargando…</td></tr>}
               </tbody>
             </table>
           </div>

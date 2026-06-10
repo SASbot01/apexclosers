@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { Heart, Trophy, ShieldCheck, Flame, Phone, ArrowLeft } from 'lucide-react'
+import { Trophy, ShieldCheck, Flame, Phone, ArrowLeft } from 'lucide-react'
 import FloatingHeader from '../../components/FloatingHeader'
 import ProgressRing from '../../components/ProgressRing'
 import AnimatedValue from '../../components/AnimatedValue'
@@ -9,11 +9,14 @@ import { fmtDateTime } from '../../lib/format'
 import { getUserId } from '../../lib/config'
 import { getRanking } from '../../lib/workflowApi'
 import { CLIENTS, clientName } from '../../data/mock/clients'
+import { listClients, createClient, deleteClient } from '../../lib/clientsApi'
 import {
-  getProfile, getProfileById, updateProfile, uploadPhoto, searchProfiles, getCV, fileToDataUrl,
+  getProfile, getProfileById, updateProfile, uploadPhoto, searchProfiles, getCV, fileToDataUrl, setProfileStatus,
   listFriends, invite, respondInvite, removeFriend, listGroups, createGroup, deleteGroup, groupAdd, groupRemove,
   listTeams, createTeam, deleteTeam, teamAdd, teamRemove,
 } from '../../lib/profileApi'
+import AvailabilityDot, { STATUS_NEXT } from '../../components/AvailabilityDot'
+import { useCurrentUser } from '../../lib/auth'
 import { openCV } from './cv'
 
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
@@ -36,6 +39,9 @@ export default function Profile() {
   const [tab, setTab] = useState('amigos')
 
   const [rank, setRank] = useState(null)
+  const [clients, setClients] = useState([])   // clientes reales del dueño del perfil (para "Cerrando para")
+  const reloadClients = useCallback(() => { listClients(targetId).then(setClients).catch(() => setClients([])) }, [targetId])
+  useEffect(() => { reloadClients() }, [reloadClients])
 
   const load = useCallback(() => {
     setState('loading')
@@ -85,7 +91,7 @@ export default function Profile() {
             </section>
           )}
 
-          <ProfileHeader profile={profile} targetId={targetId} metrics={metrics} rank={rank} scopedClient={scopedClient} onRanking={() => navigate('/ranking')} />
+          <ProfileHeader profile={profile} targetId={targetId} metrics={metrics} rank={rank} scopedClient={scopedClient} clients={clients} streak={data.streak} isOwn={isOwn} onRanking={() => navigate('/ranking')} />
 
           {/* Métricas — justo debajo del perfil, encima de amigos/grupos. */}
           <MetricsSection metrics={metrics} isOwn={isOwn} scopedClient={scopedClient} onManage={() => navigate('/ajustes')} onEvolucion={() => navigate('/finanzas')} />
@@ -109,14 +115,15 @@ export default function Profile() {
             <>
               <section className="apex-section">
                 <div className="seg" style={{ width: 'fit-content' }}>
-                  {[['amigos', 'Amigos e invitar'], ['grupos', 'Grupos'], ['equipo', 'Equipo']].map(([k, l]) => (
+                  {[['amigos', 'Amigos e invitar'], ['grupos', 'Grupos'], ['equipo', 'Equipo'], ['clientes', 'Clientes']].map(([k, l]) => (
                     <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
                   ))}
                 </div>
               </section>
               {tab === 'amigos' && <FriendsPanel onOpen={(id) => navigate(`/perfil/${id}`)} />}
               {tab === 'grupos' && <GroupsPanel />}
-              {tab === 'equipo' && <TeamsPanel onOpenMember={(id, cl) => navigate(`/perfil/${id}?client=${cl}`)} />}
+              {tab === 'equipo' && <TeamsPanel clients={clients} onOpenMember={(id, cl) => navigate(`/perfil/${id}?client=${cl}`)} />}
+              {tab === 'clientes' && <ClientsManager clients={clients} onChange={reloadClients} />}
             </>
           )}
         </>
@@ -127,22 +134,6 @@ export default function Profile() {
 }
 
 const ghost = { background: 'transparent', color: 'var(--apex-plat-mid)', borderColor: 'var(--apex-border)' }
-
-const LIKES_KEY = 'apex_closer_profile_likes'
-function LikeButton({ id }) {
-  const [liked, setLiked] = useState(() => { try { return !!(JSON.parse(localStorage.getItem(LIKES_KEY)) || {})[id] } catch { return false } })
-  const base = 128
-  const toggle = () => setLiked(v => {
-    const nv = !v
-    try { const o = JSON.parse(localStorage.getItem(LIKES_KEY)) || {}; o[id] = nv; localStorage.setItem(LIKES_KEY, JSON.stringify(o)) } catch { /* off */ }
-    return nv
-  })
-  return (
-    <button type="button" className="pf-like" data-on={liked || undefined} onClick={toggle} title="Me gusta">
-      <Heart size={14} strokeWidth={1.8} fill={liked ? 'currentColor' : 'none'} /> {base + (liked ? 1 : 0)}
-    </button>
-  )
-}
 
 function RankBanner({ rank, isOwn, onOpen }) {
   if (!rank) return null
@@ -158,43 +149,60 @@ function RankBanner({ rank, isOwn, onOpen }) {
   )
 }
 
-function ProfileHeader({ profile, targetId, metrics = [], rank, onRanking, scopedClient }) {
+function ProfileHeader({ profile, targetId, metrics = [], rank, onRanking, scopedClient, clients = [], streak = false, isOwn = false }) {
+  const [status, setStatus] = useState(profile.status || 'available')
+  const cycleStatus = () => { const next = STATUS_NEXT[status] || 'available'; setStatus(next); setProfileStatus(next).catch(() => {}) }
   const rev = metrics.find(m => m.key === 'revenue' && m.value != null)
   const cash = metrics.find(m => m.key === 'cash_collected' && m.value != null)
   const calls = metrics.find(m => m.key === 'calls')?.value || 0
-  const levelName = !rank ? 'Closer' : rank.rank <= 3 ? 'Leyenda' : rank.rank <= 10 ? 'Élite' : rank.rank <= 30 ? 'Pro' : 'Retador'
-  const nextName = !rank || rank.rank <= 3 ? null : rank.rank <= 10 ? 'Leyenda' : rank.rank <= 30 ? 'Élite' : 'Pro'
-  const levelPct = !rank ? 0.3 : rank.rank <= 3 ? 1 : Math.min(0.95, 0.5 + 2 / (rank.rank + 1))
-  const badges = [
-    { Icon: ShieldCheck, label: 'Verificado' },
-    ...(rank && rank.rank <= 10 ? [{ Icon: Trophy, label: 'Top 10' }] : []),
-    ...(calls >= 100 ? [{ Icon: Phone, label: '+100 llamadas' }] : []),
-    { Icon: Flame, label: 'En racha' },
+  // Datos REALES para nivel y medallas: revenue y cierres verificados (del
+  // ranking, públicos), llamadas y racha (venta verificada en los últimos 30 días).
+  const revenue = (rank?.revenue ?? rev?.value) || 0
+  const deals = (rank?.deals ?? metrics.find(m => m.key === 'deals')?.value) || 0
+  // Nivel por REVENUE verificado (logro real, no por posición en el ranking).
+  const LEVELS = [
+    { min: 100000, name: 'Leyenda' }, { min: 50000, name: 'Élite' },
+    { min: 20000, name: 'Pro' }, { min: 5000, name: 'Retador' }, { min: 0, name: 'Closer' },
   ]
+  const li = LEVELS.findIndex(l => revenue >= l.min)
+  const levelName = LEVELS[li].name
+  const nextLevel = li > 0 ? LEVELS[li - 1] : null
+  const nextName = nextLevel?.name || null
+  const levelPct = nextLevel ? Math.max(0.04, Math.min(0.99, (revenue - LEVELS[li].min) / (nextLevel.min - LEVELS[li].min))) : 1
+  // Medallas: solo las que se ha ganado de verdad.
+  const badges = [
+    ...(deals > 0 ? [{ Icon: ShieldCheck, label: 'Closer verificado' }] : []),
+    ...(rank && revenue > 0 && rank.rank <= 10 ? [{ Icon: Trophy, label: rank.rank <= 3 ? 'Top 3' : 'Top 10' }] : []),
+    ...(calls >= 100 ? [{ Icon: Phone, label: '+100 llamadas' }] : []),
+    ...(streak ? [{ Icon: Flame, label: 'En racha' }] : []),
+  ]
+  if (!badges.length) badges.push({ Icon: ShieldCheck, label: 'Nuevo closer' })
   return (
     <section className="apex-section">
       <div className="pf-top">
         <div className="pf-avatar-xl">{profile.photo_url ? <img src={profile.photo_url} alt="" /> : <span>{initials(profile.display_name || profile.nickname)}</span>}</div>
 
         <div className="apex-card pf-id-card">
-          <LikeButton id={targetId} />
           <div className="pf-id-grid">
             <div className="pf-col-main">
               <h2 className="pf-name">{profile.display_name || profile.nickname || 'Sin nombre'}</h2>
               {profile.nickname && <span className="pf-nick">@{profile.nickname}</span>}
+              {!scopedClient && <div style={{ marginTop: 6 }}><AvailabilityDot status={status} onClick={isOwn ? cycleStatus : undefined} /></div>}
               {profile.headline && <div className="pf-headline">{profile.headline}</div>}
               {profile.location && <div className="pf-loc">{profile.location}</div>}
-              <div className="pf-clients">
-                <span className="pf-clients-lbl">Cerrando para</span>
-                <span className="pf-clients-list">{(scopedClient ? CLIENTS.filter(c => c.id === scopedClient) : CLIENTS).map(c => <span className="pf-client-chip" key={c.id} data-active={scopedClient === c.id || undefined}>{c.name}</span>)}</span>
-              </div>
+              {(clients.length > 0 || scopedClient) && (
+                <div className="pf-clients">
+                  <span className="pf-clients-lbl">Cerrando para</span>
+                  <span className="pf-clients-list">{(scopedClient ? clients.filter(c => c.id === scopedClient) : clients).map(c => <span className="pf-client-chip" key={c.id} data-active={scopedClient === c.id || undefined}>{c.name}</span>)}</span>
+                </div>
+              )}
               {profile.bio && <p className="pf-bio">{profile.bio}</p>}
               <div className="pf-merits">
                 {!scopedClient && (
                   <div className="pf-merit">
-                    <span className="pf-side-lbl">Nivel · <b className="pf-merit-name">Closer {levelName}</b></span>
+                    <span className="pf-side-lbl">Nivel · <b className="pf-merit-name">{levelName}</b></span>
                     <div className="pf-level-bar"><div className="pf-level-fill" style={{ width: `${Math.round(levelPct * 100)}%` }} /></div>
-                    <span className="pf-side-hint">{nextName ? `En camino a ${nextName}` : 'Nivel máximo alcanzado'}</span>
+                    <span className="pf-side-hint">{nextName ? `Faltan ${money(nextLevel.min - revenue)} para ${nextName}` : 'Nivel máximo alcanzado'}</span>
                   </div>
                 )}
                 <div className="pf-badges-list">
@@ -379,12 +387,20 @@ function FriendsPanel({ onOpen }) {
   const load = () => listFriends().then(setD).catch(() => {})
   useEffect(() => { load() }, [])
 
+  // Búsqueda EN VIVO (typeahead): desde 2 caracteres, con debounce. Ya no hace
+  // falta el nombre completo ni pulsar Enter — aparecen las coincidencias solas.
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) { setResults([]); return }
+    const t = setTimeout(() => { searchProfiles(term).then(setResults).catch(() => setResults([])) }, 220)
+    return () => clearTimeout(t)
+  }, [q])
   const doSearch = async () => { if (!q.trim()) return setResults([]); setResults(await searchProfiles(q).catch(() => [])) }
   const doInvite = async (payload) => {
     setMsg(null)
     try {
       const r = await invite(payload)
-      setMsg(r.already ? `Ya conectados (${r.already}).` : 'Invitación enviada.'); load()
+      setMsg(r.already ? `Ya conectados (${r.already}).` : 'Invitación enviada.'); load(); doSearch()
     } catch (e) { setMsg(e.message === 'user_not_found' ? 'No encontré a ese usuario.' : 'No pude invitar.') }
   }
 
@@ -393,9 +409,9 @@ function FriendsPanel({ onOpen }) {
       <section className="apex-section">
         <div className="apex-card" style={{ padding: 20 }}>
           <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Buscar perfiles e invitar</h3>
-          <p className="set-note" style={{ margin: '0 0 12px' }}>Encuentra a otros closers por su nickname (o invita por email) y conéctate para ver sus métricas públicas.</p>
+          <p className="set-note" style={{ margin: '0 0 12px' }}>Empieza a escribir un nombre o nickname y aparecen las coincidencias. También puedes invitar por email. Conéctate para ver sus métricas públicas.</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input className="ac-input" style={{ maxWidth: 280 }} placeholder="Buscar por nickname o email…" value={q}
+            <input className="ac-input" style={{ maxWidth: 280 }} placeholder="Escribe un nombre o nickname…" value={q}
               onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && doSearch()} />
             <button className="ac-btn" style={ghost} onClick={doSearch}>Buscar</button>
             {q.includes('@') && <button className="ac-btn" onClick={() => doInvite({ email: q })}>Invitar a {q}</button>}
@@ -406,8 +422,14 @@ function FriendsPanel({ onOpen }) {
               {results.map(r => (
                 <div className="pf-friend" key={r.user_id}>
                   <FriendAvatar p={r} />
-                  <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(r.user_id)}>{r.display_name}</span>{r.nickname && <span className="pf-friend-nick">@{r.nickname}</span>}</div>
-                  <button className="sales-mini sales-mini--go" onClick={() => doInvite({ targetId: r.user_id })}>Invitar</button>
+                  <div className="pf-friend-id"><span className="pf-friend-name" onClick={() => onOpen(r.user_id)}>{r.display_name}</span>{r.nickname && <span className="pf-friend-nick">@{r.nickname}</span>}<AvailabilityDot status={r.status} /></div>
+                  {r.relation === 'friends'
+                    ? <span className="sales-mini" style={{ opacity: 0.7 }}>Amigo ✓</span>
+                    : r.relation === 'pending_out'
+                      ? <span className="sales-mini" style={{ opacity: 0.7 }}>Pendiente</span>
+                      : r.relation === 'pending_in'
+                        ? <span className="sales-mini" style={{ opacity: 0.7 }}>Te invitó →</span>
+                        : <button className="sales-mini sales-mini--go" onClick={() => doInvite({ targetId: r.user_id })}>Invitar</button>}
                 </div>
               ))}
             </div>
@@ -571,19 +593,59 @@ function ScopedActivity({ activity, clientId, onOpenCall }) {
 // Equipos de cliente: cada equipo trabaja UNA cuenta; sus datos se ven filtrados a
 // ese cliente (revenue/cierres/llamadas del equipo en esa cuenta + aporte de cada
 // miembro). Crear equipo = nombre + emoji + cliente; luego se añaden closers amigos.
-function TeamsPanel({ onOpenMember }) {
+function ClientsManager({ clients = [], onChange }) {
+  const [name, setName] = useState('')
+  const [sector, setSector] = useState('')
+  const add = async () => { if (!name.trim()) return; await createClient(name.trim(), sector.trim() || null).catch(() => {}); setName(''); setSector(''); onChange?.() }
+  const remove = async (id) => { if (window.confirm('¿Quitar este cliente?')) { await deleteClient(id).catch(() => {}); onChange?.() } }
+  return (
+    <section className="apex-section">
+      <div className="apex-card" style={{ padding: 20 }}>
+        <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Tus clientes</h3>
+        <p className="set-note" style={{ margin: '0 0 12px' }}>Añade a mano las cuentas/clientes para los que cierras. Aparecen en tu perfil ("Cerrando para") y sirven para etiquetar ventas y montar equipos con métricas por cliente.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <input className="ac-input" style={{ maxWidth: 240 }} placeholder="Nombre del cliente (ej. Enforma con Hugo)" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+          <input className="ac-input" style={{ maxWidth: 180 }} placeholder="Sector (opcional)" value={sector} onChange={e => setSector(e.target.value)} />
+          <button className="ac-btn" onClick={add}>Añadir cliente</button>
+        </div>
+        {clients.length === 0
+          ? <p className="ac-empty" style={{ padding: 0 }}>Aún no tienes clientes. Añade el primero arriba.</p>
+          : <div className="pf-friend-list">
+              {clients.map(c => (
+                <div className="pf-friend" key={c.id}>
+                  <FriendAvatar p={{ display_name: c.name }} />
+                  <div className="pf-friend-id"><span className="pf-friend-name">{c.name}</span>{c.sector && <span className="pf-friend-nick">{c.sector}</span>}</div>
+                  <button className="sales-mini sales-mini--del" onClick={() => remove(c.id)}>Quitar</button>
+                </div>
+              ))}
+            </div>}
+      </div>
+    </section>
+  )
+}
+
+function TeamsPanel({ onOpenMember, clients = [] }) {
   const [teams, setTeams] = useState([])
   const [friends, setFriends] = useState([])
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🎯')
-  const [clientId, setClientId] = useState(CLIENTS[0]?.id || '')
+  const [clientId, setClientId] = useState('')
+  const cname = (id) => clients.find(c => c.id === id)?.name || clientName(id)
   const load = () => { listTeams().then(setTeams).catch(() => {}); listFriends().then(d => setFriends(d.friends)).catch(() => {}) }
   useEffect(() => { load() }, [])
 
   const add = async () => { if (!name.trim() || !clientId) return; await createTeam(name, emoji, clientId).catch(() => {}); setName(''); load() }
+  const me = useCurrentUser() || {}
+  const canCreate = me.account_type === 'client'   // solo las cuentas de cliente crean equipos
 
   return (
     <section className="apex-section">
+      {!canCreate && (
+        <div className="apex-card" style={{ padding: 16, marginBottom: 16, color: 'var(--apex-plat-mid)', fontSize: 13 }}>
+          Los <b>equipos los crea el cliente</b> para el que trabajas (cuenta verificada). Aquí verás los equipos a los que te añadan.
+        </div>
+      )}
+      {canCreate && (
       <div className="apex-card" style={{ padding: 20, marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontWeight: 400 }}>Montar equipo de cliente</h3>
         <p className="set-note" style={{ margin: '0 0 12px' }}>Un equipo agrupa a los closers que trabajan <b>una misma cuenta</b>. Sus métricas se ven <b>filtradas solo a ese cliente</b>.</p>
@@ -591,13 +653,16 @@ function TeamsPanel({ onOpenMember }) {
           <input className="ac-input" style={{ width: 60, textAlign: 'center' }} value={emoji} onChange={e => setEmoji(e.target.value.slice(0, 2))} />
           <input className="ac-input" style={{ maxWidth: 240 }} placeholder="Nombre del equipo (ej. Escuadrón Hugo)" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
           <select className="ac-input" style={{ maxWidth: 220 }} value={clientId} onChange={e => setClientId(e.target.value)}>
-            {CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="">— elige cliente —</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button className="ac-btn" onClick={add}>Crear equipo</button>
+          {clients.length === 0 && <span className="set-note" style={{ flexBasis: '100%' }}>Primero añade clientes en la pestaña <b>Clientes</b>.</span>}
         </div>
       </div>
+      )}
 
-      {teams.length === 0 && <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>Sin equipos todavía. Crea uno y asígnalo a un cliente.</div>}
+      {teams.length === 0 && <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>{canCreate ? 'Sin equipos todavía. Crea uno y asígnalo a un cliente.' : 'Todavía no estás en ningún equipo.'}</div>}
       {teams.map(t => (
         <div className="apex-card pf-team" key={t.id} style={{ padding: 20, marginBottom: 12 }}>
           <div className="pf-team-head">
@@ -605,7 +670,7 @@ function TeamsPanel({ onOpenMember }) {
               <span className="pf-team-emoji">{t.emoji}</span>
               <div>
                 <h3 style={{ margin: 0, fontWeight: 400 }}>{t.name} <span style={{ color: 'var(--apex-plat-low)', fontSize: 12 }}>· {t.members.length} closers</span></h3>
-                <span className="pf-team-client">{clientName(t.client_id)}</span>
+                <span className="pf-team-client">{cname(t.client_id)}</span>
               </div>
             </div>
             <button className="sales-mini sales-mini--del" onClick={() => deleteTeam(t.id).then(load)}>Eliminar equipo</button>

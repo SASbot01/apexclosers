@@ -13,6 +13,7 @@
 //   POST group-remove Body { userId, groupId, memberId }
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
+import { computeUserMetrics } from './metrics.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -27,6 +28,11 @@ export default async function handler(req, res) {
     if (action === 'group-delete') return groupDelete(req, res)
     if (action === 'group-add')    return groupAdd(req, res)
     if (action === 'group-remove') return groupRemove(req, res)
+    if (action === 'teams')        return listTeams(req, res)
+    if (action === 'team-create')  return teamCreate(req, res)
+    if (action === 'team-delete')  return teamDelete(req, res)
+    if (action === 'team-add')     return teamAdd(req, res)
+    if (action === 'team-remove')  return teamRemove(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[friends]', action, e)
@@ -39,7 +45,7 @@ async function cardsFor(ids) {
   const list = [...new Set(ids.filter(Boolean))]
   if (!list.length) return {}
   const [{ data: profs }, { data: users }] = await Promise.all([
-    supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url').in('user_id', list),
+    supabase.from('profiles').select('user_id, nickname, display_name, headline, photo_url, status').in('user_id', list),
     supabase.from('users').select('id, name, email, picture').in('id', list),
   ])
   const byUser = new Map((users || []).map(u => [u.id, u]))
@@ -53,6 +59,7 @@ async function cardsFor(ids) {
       display_name: p?.display_name || u?.name || u?.email?.split('@')[0] || 'Closer',
       headline: p?.headline || null,
       photo_url: p?.photo_url || u?.picture || null,
+      status: p?.status || 'available',
     }
   }
   return map
@@ -185,5 +192,84 @@ async function groupRemove(req, res) {
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   if (!(await ownsGroup(userId, groupId))) return res.status(403).json({ error: 'not_your_group' })
   await supabase.from('friend_group_members').delete().eq('group_id', groupId).eq('user_id', memberId)
+  return res.status(200).json({ ok: true })
+}
+
+// ── Equipos de cliente ──────────────────────────────────────────────────────
+// Un equipo trabaja UNA cuenta (client_key). A cada miembro se le comparten las
+// métricas del dueño FILTRADAS a ese cliente. El marcador y el aporte de cada
+// closer se calculan con computeUserMetrics(memberId, client_key) → ventas
+// verificadas de ese cliente. (Las métricas de llamadas no se filtran por cliente.)
+async function listTeams(req, res) {
+  const userId = req.query.userId
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { data: teams } = await supabase.from('teams').select('*').eq('owner_id', userId).order('created_at')
+  const tids = (teams || []).map(t => t.id)
+  const memsByTeam = {}
+  let cards = {}
+  if (tids.length) {
+    const { data: mems } = await supabase.from('team_members').select('team_id, user_id').in('team_id', tids)
+    cards = await cardsFor((mems || []).map(m => m.user_id))
+    for (const m of (mems || [])) (memsByTeam[m.team_id] = memsByTeam[m.team_id] || []).push(m.user_id)
+  }
+  const out = []
+  for (const t of (teams || [])) {
+    const memberIds = memsByTeam[t.id] || []
+    const members = []
+    const totals = { revenue: 0, cash: 0, deals: 0, calls: 0, close_rate: null }
+    for (const mid of memberIds) {
+      const m = await computeUserMetrics(mid, t.client_key).catch(() => null)
+      const stats = { revenue: m?.revenue || 0, deals: m?.deals || 0, cash: m?.cash_collected || 0 }
+      totals.revenue += stats.revenue; totals.cash += stats.cash; totals.deals += stats.deals
+      members.push({ ...(cards[mid] || { user_id: mid, display_name: 'Closer' }), stats })
+    }
+    out.push({ id: t.id, name: t.name, emoji: t.emoji, client_id: t.client_key, members, totals })
+  }
+  return res.status(200).json({ teams: out })
+}
+
+async function ownsTeam(userId, teamId) {
+  const { data } = await supabase.from('teams').select('id').eq('id', teamId).eq('owner_id', userId).maybeSingle()
+  return !!data
+}
+
+async function teamCreate(req, res) {
+  const { userId, name, emoji, clientId } = req.body || {}
+  if (!userId || !name || !clientId) return res.status(400).json({ error: 'userId_name_client_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  // Solo las CUENTAS DE CLIENTE pueden crear equipos: así queda verificado que el
+  // cliente es real (se las damos nosotros) y que el closer trabaja para él.
+  const { data: u } = await supabase.from('users').select('account_type').eq('id', userId).maybeSingle()
+  if (u?.account_type !== 'client') return res.status(403).json({ error: 'only_clients_can_create_teams' })
+  const { data, error } = await supabase.from('teams').insert({ owner_id: userId, name, emoji: emoji || null, client_key: clientId }).select('*').single()
+  if (error) return res.status(500).json({ error: error.message })
+  return res.status(200).json({ team: { id: data.id, name: data.name, emoji: data.emoji, client_id: data.client_key, members: [], totals: { revenue: 0, cash: 0, deals: 0, calls: 0, close_rate: null } } })
+}
+
+async function teamDelete(req, res) {
+  const { userId, teamId } = req.body || {}
+  if (!userId || !teamId) return res.status(400).json({ error: 'userId_and_teamId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  await supabase.from('teams').delete().eq('id', teamId).eq('owner_id', userId)
+  return res.status(200).json({ ok: true })
+}
+
+async function teamAdd(req, res) {
+  const { userId, teamId, memberId } = req.body || {}
+  if (!userId || !teamId || !memberId) return res.status(400).json({ error: 'missing_fields' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  if (!(await ownsTeam(userId, teamId))) return res.status(403).json({ error: 'not_your_team' })
+  const { error } = await supabase.from('team_members').upsert({ team_id: teamId, user_id: memberId }, { onConflict: 'team_id,user_id' })
+  if (error) return res.status(500).json({ error: error.message })
+  return res.status(200).json({ ok: true })
+}
+
+async function teamRemove(req, res) {
+  const { userId, teamId, memberId } = req.body || {}
+  if (!userId || !teamId || !memberId) return res.status(400).json({ error: 'missing_fields' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  if (!(await ownsTeam(userId, teamId))) return res.status(403).json({ error: 'not_your_team' })
+  await supabase.from('team_members').delete().eq('team_id', teamId).eq('user_id', memberId)
   return res.status(200).json({ ok: true })
 }

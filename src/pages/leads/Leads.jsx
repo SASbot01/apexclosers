@@ -46,6 +46,8 @@ export default function Leads() {
   const [openId, setOpenId] = useState(null)
   const [tab, setTab] = useState('datos')
   const [draft, setDraft] = useState('')
+  const [dragId, setDragId] = useState(null)   // lead que se está arrastrando
+  const [overCol, setOverCol] = useState(null) // columna resaltada al pasar por encima
   const saveTimers = useRef({})
 
   // Carga desde el backend (CRM persistido). Si no hay backend, cae a mock.
@@ -112,13 +114,15 @@ export default function Leads() {
     persist(next)
     return next
   }))
-  const move = (id, dir) => setLeads(ls => ls.map(l => {
-    if (l.id !== id) return l
-    const idx = STAGES.findIndex(s => s.key === l.stage)
-    const next = { ...l, stage: STAGES[Math.min(STAGES.length - 1, Math.max(0, idx + dir))].key }
+  // Cambia un lead a una etapa concreta (lo usa el drag-and-drop) y lo persiste.
+  const setStage = (id, stageKey) => setLeads(ls => ls.map(l => {
+    if (l.id !== id || l.stage === stageKey) return l
+    const next = { ...l, stage: stageKey }
     persist(next)
     return next
   }))
+  // Drop de una tarjeta sobre una columna.
+  const onDropCol = (stageKey) => { if (dragId) setStage(dragId, stageKey); setDragId(null); setOverCol(null) }
   const openLead = (id) => { setOpenId(id); setTab('datos') }
   const addLead = () => {
     const id = 'new' + Date.now()
@@ -186,25 +190,28 @@ export default function Leads() {
         {view === 'kanban' ? (
           <div className="pl-board">
             {byStage.map(col => (
-              <div className="pl-col" key={col.key} data-stage={col.key} data-focus={col.key === 'agendada' || undefined}>
+              <div className="pl-col" key={col.key} data-stage={col.key} data-focus={col.key === 'agendada' || undefined} data-over={overCol === col.key || undefined}
+                onDragOver={e => { if (dragId) { e.preventDefault(); if (overCol !== col.key) setOverCol(col.key) } }}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOverCol(c => c === col.key ? null : c) }}
+                onDrop={e => { e.preventDefault(); onDropCol(col.key) }}>
                 <div className="pl-col-head"><span>{col.label}</span><span className="pl-col-count">{col.items.length}</span></div>
                 <div className="pl-col-body">
                   {col.items.map(l => {
                     const temp = (l.tags || []).includes('caliente') ? 'hot' : (l.tags || []).includes('templado') ? 'warm' : (l.tags || []).includes('frío') ? 'cold' : 'none'
                     return (
-                    <div className="apex-card pl-card" key={l.id} onClick={() => openLead(l.id)}>
+                    <div className="apex-card pl-card" key={l.id} draggable
+                      data-dragging={dragId === l.id || undefined}
+                      onDragStart={e => { setDragId(l.id); e.dataTransfer.effectAllowed = 'move' }}
+                      onDragEnd={() => { setDragId(null); setOverCol(null) }}
+                      onClick={() => { if (!dragId) openLead(l.id) }}>
                       <div className="pl-card-top"><span className="pl-name"><span className="pl-dot" data-temp={temp} />{l.name}</span><span className="pl-val">{money(l.value)}</span></div>
                       {l.company && <div className="pl-company">{l.company}</div>}
                       {(l.tags || []).length > 0 && <div className="lead-tags">{l.tags.map(t => <span className="lead-tag" key={t}>{t}</span>)}</div>}
                       {l.next_step && <div className="pl-next"><span className="pl-next-label">Seguimiento</span>{l.next_step}{l.next_at ? ` · ${fmtDay(l.next_at)}` : ''}</div>}
-                      <div className="pl-move" onClick={e => e.stopPropagation()}>
-                        <button disabled={STAGES.findIndex(s => s.key === l.stage) === 0} onClick={() => move(l.id, -1)}>←</button>
-                        <button disabled={STAGES.findIndex(s => s.key === l.stage) === STAGES.length - 1} onClick={() => move(l.id, 1)}>→</button>
-                      </div>
                     </div>
                     )
                   })}
-                  {col.items.length === 0 && <div className="pl-col-empty">—</div>}
+                  {col.items.length === 0 && <div className="pl-col-empty">Suelta aquí</div>}
                 </div>
               </div>
             ))}
