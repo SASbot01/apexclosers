@@ -7,6 +7,7 @@ import {
 } from '../../lib/profileApi'
 import { signOut } from '../../lib/auth'
 import { getUserId } from '../../lib/config'
+import TeamChat from '../../components/TeamChat'
 
 /*
  * Portal del CLIENTE (empresa). Su perfil = la empresa (descripción/redes/web).
@@ -54,6 +55,7 @@ function ClientTeams({ onOpenMember }) {
   const [name, setName] = useState(''); const [emoji, setEmoji] = useState('🎯')
   const [q, setQ] = useState(''); const [results, setResults] = useState([])
   const [target, setTarget] = useState(null)   // equipo al que se invita
+  const [chat, setChat] = useState(null)        // equipo cuyo chat está abierto
   const load = () => listTeams().then(setTeams).catch(() => setTeams([]))
   useEffect(() => { load() }, [])
 
@@ -85,6 +87,7 @@ function ClientTeams({ onOpenMember }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0, fontWeight: 400 }}><span style={{ marginRight: 8 }}>{t.emoji}</span>{t.name} <span style={{ color: 'var(--apex-plat-low)', fontSize: 12 }}>· {t.members.filter(m => m.status === 'accepted').length} closers</span></h3>
             <div style={{ display: 'inline-flex', gap: 6 }}>
+              <button className="sales-mini" onClick={() => setChat(chat === t.id ? null : t.id)}>{chat === t.id ? 'Cerrar chat' : 'Chat'}</button>
               <button className="sales-mini sales-mini--go" onClick={() => setTarget(target === t.id ? null : t.id)}>{target === t.id ? 'Cerrar' : '+ Invitar closer'}</button>
               <button className="sales-mini sales-mini--del" onClick={() => deleteTeam(t.id).then(load)}>Eliminar</button>
             </div>
@@ -120,6 +123,7 @@ function ClientTeams({ onOpenMember }) {
             ))}
             {t.members.length === 0 && <p className="ac-empty" style={{ padding: 0 }}>Equipo vacío. Pulsa “+ Invitar closer”.</p>}
           </div>
+          {chat === t.id && <TeamChat teamId={t.id} title={`Chat · ${t.name}`} />}
         </div>
       ))}
     </section>

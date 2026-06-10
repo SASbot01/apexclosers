@@ -17,6 +17,7 @@ import {
   teamInvites, teamRespond, myTeams,
 } from '../../lib/profileApi'
 import AvailabilityDot, { STATUS_NEXT } from '../../components/AvailabilityDot'
+import TeamChat from '../../components/TeamChat'
 import { useCurrentUser } from '../../lib/auth'
 import { openCV } from './cv'
 
@@ -649,6 +650,7 @@ function TeamsPanel({ onOpenMember, clients = [] }) {
   const [friends, setFriends] = useState([])
   const [invites, setInvites] = useState([])   // invitaciones de equipo pendientes (closer)
   const [mine, setMine] = useState([])          // equipos donde estoy (closer)
+  const [chatTeam, setChatTeam] = useState(null) // equipo cuyo chat está abierto
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🎯')
   const [clientId, setClientId] = useState('')
@@ -686,9 +688,13 @@ function TeamsPanel({ onOpenMember, clients = [] }) {
           <h3 style={{ margin: '0 0 10px', fontWeight: 400 }}>Tus equipos</h3>
           <div className="pf-friend-list">
             {mine.map(t => (
-              <div className="pf-friend" key={t.id}>
-                <FriendAvatar p={t.company || { display_name: t.name }} />
-                <div className="pf-friend-id"><span className="pf-friend-name">{t.emoji} {t.name}</span><span className="pf-friend-nick">{t.company?.display_name || ''}</span></div>
+              <div key={t.id}>
+                <div className="pf-friend">
+                  <FriendAvatar p={t.company || { display_name: t.name }} />
+                  <div className="pf-friend-id"><span className="pf-friend-name">{t.emoji} {t.name}</span><span className="pf-friend-nick">{t.company?.display_name || ''}</span></div>
+                  <button className="sales-mini sales-mini--go" onClick={() => setChatTeam(chatTeam === t.id ? null : t.id)}>{chatTeam === t.id ? 'Cerrar chat' : 'Chat'}</button>
+                </div>
+                {chatTeam === t.id && <TeamChat teamId={t.id} title={`Chat · ${t.name}`} />}
               </div>
             ))}
           </div>

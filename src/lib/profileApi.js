@@ -59,6 +59,9 @@ export const teamRemove  = (teamId, memberId) => req('/api/friends', 'team-remov
 export const teamInvites = () => req('/api/friends', 'team-invites', { query: { userId: getUserId() } }).then(d => d.invites || [])
 export const teamRespond = (teamId, accept) => req('/api/friends', 'team-respond', { method: 'POST', body: { userId: getUserId(), teamId, accept } })
 export const myTeams     = () => req('/api/friends', 'my-teams', { query: { userId: getUserId() } }).then(d => d.teams || [])
+// Chat de equipo (empresa + closers aceptados).
+export const teamChat     = (teamId) => req('/api/friends', 'team-chat', { query: { userId: getUserId(), teamId } }).then(d => d.messages || [])
+export const teamChatSend = (teamId, body) => req('/api/friends', 'team-chat-send', { method: 'POST', body: { userId: getUserId(), teamId, body } }).then(d => d.message)
 
 export const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file)

@@ -38,6 +38,8 @@ export default async function handler(req, res) {
     if (action === 'team-invites') return teamInvites(req, res)   // pendientes del closer
     if (action === 'team-respond') return teamRespond(req, res)   // closer acepta/rechaza
     if (action === 'my-teams')     return myTeams(req, res)       // equipos donde está el closer
+    if (action === 'team-chat')      return teamChatList(req, res)
+    if (action === 'team-chat-send') return teamChatSend(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[friends]', action, e)
@@ -307,6 +309,42 @@ async function teamInvite(req, res) {
     link: '/perfil',
   }).catch(() => {})
   return res.status(200).json({ ok: true })
+}
+
+// Acceso al chat: dueño del equipo (empresa) o miembro ACEPTADO.
+async function canAccessTeam(userId, teamId) {
+  if (await ownsTeam(userId, teamId)) return true
+  const { data } = await supabase.from('team_members').select('status').eq('team_id', teamId).eq('user_id', userId).eq('status', 'accepted').maybeSingle()
+  return !!data
+}
+
+async function teamChatList(req, res) {
+  const { userId, teamId } = req.query
+  if (!userId || !teamId) return res.status(400).json({ error: 'userId_and_teamId_required' })
+  if (!supabaseReady()) return res.status(200).json({ messages: [] })
+  if (!(await canAccessTeam(userId, teamId))) return res.status(403).json({ error: 'no_access' })
+  const { data: msgs } = await supabase.from('team_messages').select('*').eq('team_id', teamId).order('created_at').limit(500)
+  const cards = await cardsFor((msgs || []).map(m => m.user_id))
+  return res.status(200).json({ messages: (msgs || []).map(m => ({ id: m.id, user_id: m.user_id, body: m.body, created_at: m.created_at, author: cards[m.user_id]?.display_name || 'Usuario' })) })
+}
+
+async function teamChatSend(req, res) {
+  const { userId, teamId, body } = req.body || {}
+  if (!userId || !teamId || !body?.trim()) return res.status(400).json({ error: 'missing_fields' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  if (!(await canAccessTeam(userId, teamId))) return res.status(403).json({ error: 'no_access' })
+  const { data, error } = await supabase.from('team_messages').insert({ team_id: teamId, user_id: userId, body: String(body).slice(0, 2000) }).select('*').single()
+  if (error) throw new Error(error.message)
+  // Notifica a los demás miembros (empresa + closers aceptados) que hay mensaje.
+  try {
+    const { data: team } = await supabase.from('teams').select('owner_id, name').eq('id', teamId).maybeSingle()
+    const { data: mems } = await supabase.from('team_members').select('user_id').eq('team_id', teamId).eq('status', 'accepted')
+    const recipients = new Set([team?.owner_id, ...(mems || []).map(m => m.user_id)].filter(Boolean))
+    recipients.delete(userId)
+    const author = (await cardsFor([userId]))[userId]?.display_name || 'Alguien'
+    for (const r of recipients) await notify(r, { kind: 'team_chat', title: `Mensaje en ${team?.name || 'tu equipo'}`, body: `${author}: ${String(body).slice(0, 80)}`, link: '/perfil' }).catch(() => {})
+  } catch { /* best-effort */ }
+  return res.status(200).json({ message: data })
 }
 
 // El closer acepta o rechaza la invitación de equipo.
