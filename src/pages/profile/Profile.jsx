@@ -14,6 +14,7 @@ import {
   getProfile, getProfileById, updateProfile, uploadPhoto, searchProfiles, getCV, fileToDataUrl, setProfileStatus,
   listFriends, invite, respondInvite, removeFriend, listGroups, createGroup, deleteGroup, groupAdd, groupRemove,
   listTeams, createTeam, deleteTeam, teamAdd, teamRemove,
+  teamInvites, teamRespond, myTeams,
 } from '../../lib/profileApi'
 import AvailabilityDot, { STATUS_NEXT } from '../../components/AvailabilityDot'
 import { useCurrentUser } from '../../lib/auth'
@@ -32,6 +33,7 @@ export default function Profile() {
   const scopedClient = searchParams.get('client') || null   // perfil filtrado a un cliente (vía equipo)
   const targetId = routeUserId || getUserId()
   const isOwn = targetId === getUserId() && !scopedClient
+  const me = useCurrentUser() || {}
 
   const [data, setData] = useState(null)     // { profile, metrics, isOwner, friendship }
   const [state, setState] = useState('loading')
@@ -69,7 +71,8 @@ export default function Profile() {
           {scopedClient
             ? <button className="ac-btn" style={ghost} onClick={() => navigate(-1)}>← Volver al equipo</button>
             : <>
-                {!isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/perfil')}>← Mi perfil</button>}
+                {!isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/perfil')}>← Volver</button>}
+                {!isOwn && me.account_type === 'client' && <InviteToTeam targetId={targetId} />}
                 {isOwn && <button className="ac-btn" style={ghost} onClick={() => navigate('/ranking')}>Ranking</button>}
                 <button className="ac-btn" style={ghost} onClick={() => navigate(`/cv/${targetId}`)}>Currículum</button>
                 {isOwn && !editing && <button className="ac-btn" onClick={() => setEditing(true)}>Editar perfil</button>}
@@ -624,14 +627,37 @@ function ClientsManager({ clients = [], onChange }) {
   )
 }
 
+// Botón para que una EMPRESA invite a este closer a uno de sus equipos (desde el
+// perfil del closer). La invitación le llega al closer como notificación + recuadro.
+function InviteToTeam({ targetId }) {
+  const [teams, setTeams] = useState([])
+  const [msg, setMsg] = useState(null)
+  useEffect(() => { listTeams().then(setTeams).catch(() => {}) }, [])
+  const invite = async (teamId) => { if (!teamId) return; await teamAdd(teamId, targetId).catch(() => {}); setMsg('Invitación enviada ✓') }
+  if (msg) return <span className="ac-btn" style={{ ...ghost, cursor: 'default' }}>{msg}</span>
+  if (!teams.length) return null
+  return (
+    <select className="ac-input" style={{ padding: '7px 10px', fontSize: 12.5, maxWidth: 200 }} defaultValue="" onChange={e => invite(e.target.value)}>
+      <option value="">Invitar a un equipo…</option>
+      {teams.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
+    </select>
+  )
+}
+
 function TeamsPanel({ onOpenMember, clients = [] }) {
   const [teams, setTeams] = useState([])
   const [friends, setFriends] = useState([])
+  const [invites, setInvites] = useState([])   // invitaciones de equipo pendientes (closer)
+  const [mine, setMine] = useState([])          // equipos donde estoy (closer)
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🎯')
   const [clientId, setClientId] = useState('')
   const cname = (id) => clients.find(c => c.id === id)?.name || clientName(id)
-  const load = () => { listTeams().then(setTeams).catch(() => {}); listFriends().then(d => setFriends(d.friends)).catch(() => {}) }
+  const load = () => {
+    listTeams().then(setTeams).catch(() => {}); listFriends().then(d => setFriends(d.friends)).catch(() => {})
+    teamInvites().then(setInvites).catch(() => {}); myTeams().then(setMine).catch(() => {})
+  }
+  const respond = async (teamId, accept) => { await teamRespond(teamId, accept).catch(() => {}); load() }
   useEffect(() => { load() }, [])
 
   const add = async () => { if (!name.trim() || !clientId) return; await createTeam(name, emoji, clientId).catch(() => {}); setName(''); load() }
@@ -640,9 +666,37 @@ function TeamsPanel({ onOpenMember, clients = [] }) {
 
   return (
     <section className="apex-section">
-      {!canCreate && (
+      {invites.length > 0 && (
+        <div className="apex-card" style={{ padding: 18, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--apex-accent, #8AC8E0) 40%, var(--apex-border))' }}>
+          <h3 style={{ margin: '0 0 10px', fontWeight: 400 }}>Invitaciones a equipo</h3>
+          <div className="pf-friend-list">
+            {invites.map(iv => (
+              <div className="pf-friend" key={iv.teamId}>
+                <FriendAvatar p={iv.company || { display_name: 'Empresa' }} />
+                <div className="pf-friend-id"><span className="pf-friend-name">{iv.emoji} {iv.name}</span><span className="pf-friend-nick">{iv.company?.display_name || 'Una empresa'} te invita a su equipo</span></div>
+                <button className="sales-mini sales-mini--go" onClick={() => respond(iv.teamId, true)}>Aceptar</button>
+                <button className="sales-mini sales-mini--del" onClick={() => respond(iv.teamId, false)}>Rechazar</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!canCreate && mine.length > 0 && (
+        <div className="apex-card" style={{ padding: 18, marginBottom: 16 }}>
+          <h3 style={{ margin: '0 0 10px', fontWeight: 400 }}>Tus equipos</h3>
+          <div className="pf-friend-list">
+            {mine.map(t => (
+              <div className="pf-friend" key={t.id}>
+                <FriendAvatar p={t.company || { display_name: t.name }} />
+                <div className="pf-friend-id"><span className="pf-friend-name">{t.emoji} {t.name}</span><span className="pf-friend-nick">{t.company?.display_name || ''}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!canCreate && invites.length === 0 && mine.length === 0 && (
         <div className="apex-card" style={{ padding: 16, marginBottom: 16, color: 'var(--apex-plat-mid)', fontSize: 13 }}>
-          Los <b>equipos los crea el cliente</b> para el que trabajas (cuenta verificada). Aquí verás los equipos a los que te añadan.
+          Los <b>equipos los crea la empresa</b> para la que trabajas. Cuando te inviten, la verás aquí para aceptar o rechazar.
         </div>
       )}
       {canCreate && (

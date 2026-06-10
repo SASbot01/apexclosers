@@ -22,7 +22,6 @@ import Ranking from './pages/ranking/Ranking'
 import Workshop from './pages/workshop/Workshop'
 import CV from './pages/cv/CV'
 import ClientPortal from './pages/client/ClientPortal'
-import Offers from './pages/offers/Offers'
 import Admin from './pages/admin/Admin'
 import Landing from './pages/landing/Landing'
 import { useCurrentUser } from './lib/auth'
@@ -61,7 +60,6 @@ function Shell() {
         <Route element={<ApexLayout />}>
           <Route index element={<Navigate to={isClient ? '/cliente' : '/perfil'} replace />} />
           <Route path="cliente" element={<ClientPortal />} />
-          <Route path="ofertas" element={<Offers />} />
           <Route path="workshop" element={<Workshop />} />
           <Route path="llamadas" element={<Calls />} />
           <Route path="llamadas/:id" element={<CallDetail />} />

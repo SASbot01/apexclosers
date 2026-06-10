@@ -14,6 +14,7 @@
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { computeUserMetrics } from './metrics.js'
+import { notify } from './_lib/workflow.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -31,8 +32,12 @@ export default async function handler(req, res) {
     if (action === 'teams')        return listTeams(req, res)
     if (action === 'team-create')  return teamCreate(req, res)
     if (action === 'team-delete')  return teamDelete(req, res)
-    if (action === 'team-add')     return teamAdd(req, res)
+    if (action === 'team-add')     return teamInvite(req, res)
+    if (action === 'team-invite')  return teamInvite(req, res)
     if (action === 'team-remove')  return teamRemove(req, res)
+    if (action === 'team-invites') return teamInvites(req, res)   // pendientes del closer
+    if (action === 'team-respond') return teamRespond(req, res)   // closer acepta/rechaza
+    if (action === 'my-teams')     return myTeams(req, res)       // equipos donde está el closer
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[friends]', action, e)
@@ -209,20 +214,22 @@ async function listTeams(req, res) {
   const memsByTeam = {}
   let cards = {}
   if (tids.length) {
-    const { data: mems } = await supabase.from('team_members').select('team_id, user_id').in('team_id', tids)
+    const { data: mems } = await supabase.from('team_members').select('team_id, user_id, status').in('team_id', tids)
     cards = await cardsFor((mems || []).map(m => m.user_id))
-    for (const m of (mems || [])) (memsByTeam[m.team_id] = memsByTeam[m.team_id] || []).push(m.user_id)
+    for (const m of (mems || [])) (memsByTeam[m.team_id] = memsByTeam[m.team_id] || []).push(m)
   }
   const out = []
   for (const t of (teams || [])) {
-    const memberIds = memsByTeam[t.id] || []
+    const mem = memsByTeam[t.id] || []
     const members = []
     const totals = { revenue: 0, cash: 0, deals: 0, calls: 0, close_rate: null }
-    for (const mid of memberIds) {
-      const m = await computeUserMetrics(mid, t.client_key).catch(() => null)
+    for (const mm of mem) {
+      const mid = mm.user_id
+      const accepted = (mm.status || 'accepted') === 'accepted'
+      const m = accepted ? await computeUserMetrics(mid, t.client_key).catch(() => null) : null
       const stats = { revenue: m?.revenue || 0, deals: m?.deals || 0, cash: m?.cash_collected || 0 }
-      totals.revenue += stats.revenue; totals.cash += stats.cash; totals.deals += stats.deals
-      members.push({ ...(cards[mid] || { user_id: mid, display_name: 'Closer' }), stats })
+      if (accepted) { totals.revenue += stats.revenue; totals.cash += stats.cash; totals.deals += stats.deals }
+      members.push({ ...(cards[mid] || { user_id: mid, display_name: 'Closer' }), stats, status: mm.status || 'accepted' })
     }
     out.push({ id: t.id, name: t.name, emoji: t.emoji, client_id: t.client_key, members, totals })
   }
@@ -232,6 +239,32 @@ async function listTeams(req, res) {
 async function ownsTeam(userId, teamId) {
   const { data } = await supabase.from('teams').select('id').eq('id', teamId).eq('owner_id', userId).maybeSingle()
   return !!data
+}
+
+// Equipos donde el CLOSER es miembro ACEPTADO (para verlos en su perfil).
+async function myTeams(req, res) {
+  const userId = req.query.userId
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(200).json({ teams: [] })
+  const { data: mems } = await supabase.from('team_members').select('team_id').eq('user_id', userId).eq('status', 'accepted')
+  const tids = [...new Set((mems || []).map(m => m.team_id))]
+  if (!tids.length) return res.status(200).json({ teams: [] })
+  const { data: teams } = await supabase.from('teams').select('id, name, emoji, owner_id').in('id', tids)
+  const owners = await cardsFor((teams || []).map(t => t.owner_id))
+  return res.status(200).json({ teams: (teams || []).map(t => ({ id: t.id, name: t.name, emoji: t.emoji, company: owners[t.owner_id] || null })) })
+}
+
+// Invitaciones de equipo PENDIENTES del closer (recuadro en su perfil).
+async function teamInvites(req, res) {
+  const userId = req.query.userId
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(200).json({ invites: [] })
+  const { data: mems } = await supabase.from('team_members').select('team_id').eq('user_id', userId).eq('status', 'pending')
+  const tids = [...new Set((mems || []).map(m => m.team_id))]
+  if (!tids.length) return res.status(200).json({ invites: [] })
+  const { data: teams } = await supabase.from('teams').select('id, name, emoji, owner_id').in('id', tids)
+  const owners = await cardsFor((teams || []).map(t => t.owner_id))
+  return res.status(200).json({ invites: (teams || []).map(t => ({ teamId: t.id, name: t.name, emoji: t.emoji, company: owners[t.owner_id] || null })) })
 }
 
 async function teamCreate(req, res) {
@@ -255,13 +288,36 @@ async function teamDelete(req, res) {
   return res.status(200).json({ ok: true })
 }
 
-async function teamAdd(req, res) {
+// La empresa INVITA a un closer a su equipo → queda 'pending' y le llega una
+// notificación; el closer lo acepta/rechaza desde su perfil (como un amigo).
+async function teamInvite(req, res) {
   const { userId, teamId, memberId } = req.body || {}
   if (!userId || !teamId || !memberId) return res.status(400).json({ error: 'missing_fields' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   if (!(await ownsTeam(userId, teamId))) return res.status(403).json({ error: 'not_your_team' })
-  const { error } = await supabase.from('team_members').upsert({ team_id: teamId, user_id: memberId }, { onConflict: 'team_id,user_id' })
+  const { error } = await supabase.from('team_members').upsert({ team_id: teamId, user_id: memberId, status: 'pending' }, { onConflict: 'team_id,user_id' })
   if (error) return res.status(500).json({ error: error.message })
+  // Notifica al closer.
+  const { data: team } = await supabase.from('teams').select('name').eq('id', teamId).maybeSingle()
+  const company = (await cardsFor([userId]))[userId]
+  await notify(memberId, {
+    kind: 'team_invite',
+    title: 'Invitación a un equipo',
+    body: `${company?.display_name || 'Una empresa'} te invita a su equipo${team?.name ? ` "${team.name}"` : ''}. Acéptala desde tu perfil.`,
+    link: '/perfil',
+  }).catch(() => {})
+  return res.status(200).json({ ok: true })
+}
+
+// El closer acepta o rechaza la invitación de equipo.
+async function teamRespond(req, res) {
+  const { userId, teamId, accept } = req.body || {}
+  if (!userId || !teamId) return res.status(400).json({ error: 'userId_and_teamId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { data: row } = await supabase.from('team_members').select('status').eq('team_id', teamId).eq('user_id', userId).maybeSingle()
+  if (!row) return res.status(404).json({ error: 'invite_not_found' })
+  if (accept) await supabase.from('team_members').update({ status: 'accepted' }).eq('team_id', teamId).eq('user_id', userId)
+  else await supabase.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId)
   return res.status(200).json({ ok: true })
 }
 

@@ -23,12 +23,10 @@ const SECTIONS = [
   { key: 'clientes', label: 'Ventas',      path: '/clientes' },
   { key: 'llamadas', label: 'Llamadas',    path: '/llamadas' },
   { key: 'pipeline', label: 'Leads (CRM)', path: '/pipeline' },
-  { key: 'ofertas',  label: 'Ofertas',     path: '/ofertas' },
 ]
-// Navegación de las cuentas de CLIENTE (empresa): su portal + ofertas + buscar closers.
+// Navegación de las cuentas de CLIENTE (empresa): su portal (empresa + equipo) + buscar closers.
 const CLIENT_SECTIONS = [
   { key: 'cliente', label: 'Mi empresa', path: '/cliente' },
-  { key: 'ofertas', label: 'Mis ofertas', path: '/ofertas' },
   { key: 'ranking', label: 'Buscar closers', path: '/ranking' },
 ]
 

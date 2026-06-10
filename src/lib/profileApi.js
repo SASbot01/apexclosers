@@ -53,8 +53,12 @@ export const groupRemove   = (groupId, memberId) => req('/api/friends', 'group-r
 export const listTeams   = () => req('/api/friends', 'teams', { query: { userId: getUserId() } }).then(d => d.teams || [])
 export const createTeam  = (name, emoji, clientId) => req('/api/friends', 'team-create', { method: 'POST', body: { userId: getUserId(), name, emoji, clientId } }).then(d => d.team)
 export const deleteTeam  = (teamId) => req('/api/friends', 'team-delete', { method: 'POST', body: { userId: getUserId(), teamId } })
-export const teamAdd     = (teamId, memberId) => req('/api/friends', 'team-add', { method: 'POST', body: { userId: getUserId(), teamId, memberId } })
+export const teamAdd     = (teamId, memberId) => req('/api/friends', 'team-invite', { method: 'POST', body: { userId: getUserId(), teamId, memberId } })
 export const teamRemove  = (teamId, memberId) => req('/api/friends', 'team-remove', { method: 'POST', body: { userId: getUserId(), teamId, memberId } })
+// Invitaciones de equipo del closer (recuadro en su perfil) + equipos donde está.
+export const teamInvites = () => req('/api/friends', 'team-invites', { query: { userId: getUserId() } }).then(d => d.invites || [])
+export const teamRespond = (teamId, accept) => req('/api/friends', 'team-respond', { method: 'POST', body: { userId: getUserId(), teamId, accept } })
+export const myTeams     = () => req('/api/friends', 'my-teams', { query: { userId: getUserId() } }).then(d => d.teams || [])
 
 export const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file)
