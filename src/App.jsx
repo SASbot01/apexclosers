@@ -21,6 +21,9 @@ import Sequences from './pages/sequences/Sequences'
 import Ranking from './pages/ranking/Ranking'
 import Workshop from './pages/workshop/Workshop'
 import CV from './pages/cv/CV'
+import ClientPortal from './pages/client/ClientPortal'
+import Offers from './pages/offers/Offers'
+import { useCurrentUser } from './lib/auth'
 
 /*
  * Shell de la app (software sin nombre · marca = logo Apex).
@@ -43,12 +46,16 @@ export default function App() {
 
 function Shell() {
   const { theme } = useApexTheme()
+  const user = useCurrentUser()
+  const isClient = user?.account_type === 'client'
   return (
     <div className="apex-ops" data-theme={theme}>
       <AtmosphericCanvas />
       <Routes>
         <Route element={<ApexLayout />}>
-          <Route index element={<Navigate to="/perfil" replace />} />
+          <Route index element={<Navigate to={isClient ? '/cliente' : '/perfil'} replace />} />
+          <Route path="cliente" element={<ClientPortal />} />
+          <Route path="ofertas" element={<Offers />} />
           <Route path="workshop" element={<Workshop />} />
           <Route path="llamadas" element={<Calls />} />
           <Route path="llamadas/:id" element={<CallDetail />} />

@@ -52,6 +52,18 @@ export function signInWithGoogle() {
   window.location.href = `${API_BASE}/api/auth?action=google-start${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
 }
 
+// Login de cuenta de CLIENTE (email + contraseña). Guarda la sesión y entra.
+export async function signInClient(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth?action=client-login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data.token) throw new Error(data.error || 'invalid_credentials')
+  try { localStorage.setItem(TOKEN_KEY, data.token); if (data.user) localStorage.setItem(USER_CACHE, JSON.stringify(data.user)) } catch { /* off */ }
+  window.location.href = '/'
+}
+
 export function signInDemo() {
   const demo = {
     id: '00000000-0000-0000-0000-000000000001',

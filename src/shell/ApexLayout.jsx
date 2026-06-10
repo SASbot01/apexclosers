@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, Menu, Settings } from 'lucide-react'
 import { useApexTheme, THEMES } from './ThemeContext'
 import NotificationsBell from './NotificationsBell'
+import { useCurrentUser } from '../lib/auth'
 
 /*
  * ApexLayout — shell compartido. Portado de Apex Operations, limpio:
@@ -22,6 +23,13 @@ const SECTIONS = [
   { key: 'clientes', label: 'Ventas',      path: '/clientes' },
   { key: 'llamadas', label: 'Llamadas',    path: '/llamadas' },
   { key: 'pipeline', label: 'Leads (CRM)', path: '/pipeline' },
+  { key: 'ofertas',  label: 'Ofertas',     path: '/ofertas' },
+]
+// Navegación de las cuentas de CLIENTE (empresa): su portal + ofertas + buscar closers.
+const CLIENT_SECTIONS = [
+  { key: 'cliente', label: 'Mi empresa', path: '/cliente' },
+  { key: 'ofertas', label: 'Mis ofertas', path: '/ofertas' },
+  { key: 'ranking', label: 'Buscar closers', path: '/ranking' },
 ]
 
 export default function ApexLayout() {
@@ -37,7 +45,9 @@ export default function ApexLayout() {
 
   const location = useLocation()
   const navigate = useNavigate()
-  const activeKey = sectionKeyForPath(SECTIONS, location.pathname)
+  const user = useCurrentUser()
+  const sections = user?.account_type === 'client' ? CLIENT_SECTIONS : SECTIONS
+  const activeKey = sectionKeyForPath(sections, location.pathname)
 
   return (
     <>
@@ -45,11 +55,11 @@ export default function ApexLayout() {
 
       <header className="apex-topbar" data-scrolled={scrolled || undefined}>
         <div className="apex-topbar-inner">
-          <MobileSectionMenu sections={SECTIONS} active={activeKey} pathname={location.pathname} />
+          <MobileSectionMenu sections={sections} active={activeKey} pathname={location.pathname} />
           <div className="apex-brand">
             <ThemePicker />
           </div>
-          <SectionNav sections={SECTIONS} active={activeKey} pathname={location.pathname} />
+          <SectionNav sections={sections} active={activeKey} pathname={location.pathname} />
           <div className="apex-topbar-end" aria-hidden="true" />
           <NotificationsBell />
           <button

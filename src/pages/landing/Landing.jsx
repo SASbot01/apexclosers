@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useApexTheme } from '../../shell/ThemeContext'
 import AtmosphericCanvas from '../../shell/AtmosphericCanvas'
-import { signInWithGoogle, signInDemo } from '../../lib/auth'
+import { signInWithGoogle, signInDemo, signInClient } from '../../lib/auth'
 
 /*
  * Landing pública — puerta de entrada. Cualquiera entra con Google (o modo demo
@@ -8,6 +9,16 @@ import { signInWithGoogle, signInDemo } from '../../lib/auth'
  */
 export default function Landing() {
   const { theme } = useApexTheme()
+  const [clientMode, setClientMode] = useState(false)
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const doClientLogin = async (e) => {
+    e.preventDefault(); setErr(null); setBusy(true)
+    try { await signInClient(email.trim(), pw) }
+    catch { setErr('Email o contraseña incorrectos.'); setBusy(false) }
+  }
   return (
     <div className="apex-ops lp" data-theme={theme}>
       <AtmosphericCanvas />
@@ -21,11 +32,25 @@ export default function Landing() {
         </p>
 
         <div className="lp-cta">
-          <button className="lp-google" onClick={signInWithGoogle}>
-            <GoogleIcon />
-            Entrar con Google
-          </button>
-          <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>
+          {!clientMode ? (
+            <>
+              <button className="lp-google" onClick={signInWithGoogle}>
+                <GoogleIcon />
+                Entrar con Google
+              </button>
+              <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>
+              <button className="lp-link" onClick={() => setClientMode(true)}>¿Eres una empresa? Acceso clientes →</button>
+            </>
+          ) : (
+            <form className="lp-form" onSubmit={doClientLogin}>
+              <div className="lp-form-h">Acceso clientes</div>
+              <input className="lp-input" type="email" placeholder="Email de tu cuenta" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" />
+              <input className="lp-input" type="password" placeholder="Contraseña" value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" />
+              {err && <div className="lp-err">{err}</div>}
+              <button className="lp-google" type="submit" disabled={busy || !email || !pw}>{busy ? 'Entrando…' : 'Entrar'}</button>
+              <button className="lp-link" type="button" onClick={() => { setClientMode(false); setErr(null) }}>← Soy closer</button>
+            </form>
+          )}
         </div>
 
         <ul className="lp-points">
@@ -81,6 +106,13 @@ const LP_CSS = `
   font-family: var(--apex-font); font-size: 13px; transition: border-color 0.18s, color 0.18s;
 }
 .lp-demo:hover { border-color: var(--apex-plat-mid); color: var(--apex-plat-hi); }
+.lp-link { background: transparent; border: 0; color: var(--apex-plat-low); font-family: var(--apex-font); font-size: 12.5px; cursor: pointer; padding: 6px; margin-top: 2px; }
+.lp-link:hover { color: var(--apex-plat-hi); }
+.lp-form { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; }
+.lp-form-h { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--apex-plat-low); text-align: center; margin-bottom: 2px; }
+.lp-input { padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--apex-border); color: var(--apex-plat-hi); font-family: var(--apex-font); font-size: 15px; outline: none; }
+.lp-input:focus { border-color: var(--apex-plat-mid); }
+.lp-err { font-size: 12.5px; color: #E58371; text-align: center; }
 .lp-points { list-style: none; margin: 34px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .lp-points li { font-family: var(--apex-font); font-size: 13px; color: var(--apex-plat-low); position: relative; padding-left: 18px; }
 .lp-points li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; background: var(--apex-plat-mid); }
