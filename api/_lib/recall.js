@@ -6,6 +6,8 @@
 //   RECALL_API_URL        Base URL (default: eu-central-1)
 //   APEX_PUBLIC_BASE_URL  Base pública (para finalize en background)
 
+import { BOT_FRAME_B64 } from './botFrame.js'
+
 const API_URL = process.env.RECALL_API_URL || 'https://eu-central-1.recall.ai'
 
 export function recallReady() {
@@ -32,43 +34,40 @@ async function recallFetch(path, init = {}) {
  * queda solo, se va en minutos. "Solo graba si la reunión se realiza".
  */
 export async function createBot({ meetingUrl, botName = "Apex's Notetaker", joinAt, metadata } = {}) {
-  return recallFetch('/api/v1/bot/', {
-    method: 'POST',
-    body: JSON.stringify({
-      meeting_url: meetingUrl,
-      bot_name: botName,
-      ...(joinAt ? { join_at: joinAt } : {}),
-      automatic_leave: {
-        waiting_room_timeout: 600,
-        noone_joined_timeout: 600,
-        everyone_left_timeout: 60,
-        in_call_not_recording_timeout: 600,
-      },
-      recording_config: {
-        // Si el STT local (Whisper) está activo, NO pedimos la transcripción a
-        // Recall: el bot solo graba y transcribimos en local desde recording_url.
-        // Esto evita el coste de transcripción de Recall.
-        ...(process.env.LOCAL_STT_URL ? {} : {
-          transcript: {
-            provider: {
-              recallai_streaming: {
-                language_code: 'es',
-                mode: 'prioritize_accuracy',
-                filter_profanity: false,
-              },
-            },
-          },
-        }),
-        video_mixed_layout: 'speaker_view',
-        // Eventos de participante (speaker timeline): metadato GRATIS (detección
-        // de quién habla, sin coste de transcripción). Lo cruzamos con los
-        // segmentos de Whisper para poner el nombre del Closer y del Cliente
-        // en la transcripción en vez de "Cliente" para todo. Ver assignSpeakers.
-        participant_events: {},
-      },
-      ...(metadata ? { metadata } : {}),
-    }),
-  })
+  const base = {
+    meeting_url: meetingUrl,
+    bot_name: botName,
+    ...(joinAt ? { join_at: joinAt } : {}),
+    automatic_leave: {
+      waiting_room_timeout: 600,
+      noone_joined_timeout: 600,
+      everyone_left_timeout: 60,
+      in_call_not_recording_timeout: 600,
+    },
+    recording_config: {
+      // Si el STT local (Whisper) está activo, NO pedimos la transcripción a
+      // Recall: el bot solo graba y transcribimos en local desde recording_url.
+      ...(process.env.LOCAL_STT_URL ? {} : {
+        transcript: { provider: { recallai_streaming: { language_code: 'es', mode: 'prioritize_accuracy', filter_profanity: false } } },
+      }),
+      video_mixed_layout: 'speaker_view',
+      // Speaker timeline GRATIS para poner el nombre del Closer y del Cliente.
+      participant_events: {},
+    },
+    ...(metadata ? { metadata } : {}),
+  }
+  // Imagen de cámara del bot: logo Apex + "tomando notas automáticamente" en vez
+  // de pantalla negra (JPEG 1280x720 base64). Si Recall lo rechazara por lo que
+  // sea, reintentamos SIN la imagen para no romper nunca la grabación.
+  if (BOT_FRAME_B64) {
+    const withImage = { ...base, automatic_video_output: { in_call_recording: { kind: 'jpeg', b64_data: BOT_FRAME_B64 }, in_call_not_recording: { kind: 'jpeg', b64_data: BOT_FRAME_B64 } } }
+    try {
+      return await recallFetch('/api/v1/bot/', { method: 'POST', body: JSON.stringify(withImage) })
+    } catch (e) {
+      console.error('[recall] createBot con imagen falló, reintento sin imagen:', e.message)
+    }
+  }
+  return recallFetch('/api/v1/bot/', { method: 'POST', body: JSON.stringify(base) })
 }
 
 export async function getBotRaw(botId) {
