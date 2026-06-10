@@ -24,6 +24,7 @@ import CV from './pages/cv/CV'
 import ClientPortal from './pages/client/ClientPortal'
 import Offers from './pages/offers/Offers'
 import Admin from './pages/admin/Admin'
+import Landing from './pages/landing/Landing'
 import { useCurrentUser } from './lib/auth'
 
 /*
@@ -38,6 +39,8 @@ export default function App() {
       <Routes>
         {/* Panel de administración — login propio, fuera del AuthGate. */}
         <Route path="/admin" element={<Admin />} />
+        {/* Landing pública para empresas (mensaje propio, no se mezcla con closers). */}
+        <Route path="/empresas" element={<Landing variant="company" />} />
         {/* Currículum web público (compartible) — fuera del AuthGate. */}
         <Route path="/cv/:userId" element={<CV />} />
         <Route path="/cv" element={<CV />} />

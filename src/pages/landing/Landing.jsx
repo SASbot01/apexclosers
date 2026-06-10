@@ -1,38 +1,65 @@
+import { Link } from 'react-router-dom'
 import AtmosphericCanvas from '../../shell/AtmosphericCanvas'
 import { signInWithGoogle, signInDemo } from '../../lib/auth'
 
 /*
- * Landing pública — puerta de entrada. Closers y clientes entran con Google; el
- * acceso (y el rol) lo da el admin. Estética Apex Neón (verde sobre negro).
+ * Landing pública — puerta de entrada. Dos variantes para que NO se mezclen los
+ * mensajes: closers (por defecto, en '/') y empresas/clientes (en '/empresas').
+ * Ambas entran con Google; el acceso y el rol los da el admin. Estética Neón.
  */
-export default function Landing() {
+const COPY = {
+  closer: {
+    title: 'El sistema operativo del closer',
+    sub: 'Graba y transcribe tus llamadas de venta, no pierdas un seguimiento y recibe feedback para cerrar más. Tu día, en piloto.',
+    points: [
+      'Notetaker que entra a tus calls, graba y transcribe',
+      'Resumen + feedback automáticos de cada llamada',
+      'Pipeline, seguimientos y métricas en un sitio',
+    ],
+    foot: 'Acceso para closers · habla hispana',
+    cross: { to: '/empresas', label: '¿Eres una empresa? Contrata closers →' },
+    demo: true,
+  },
+  company: {
+    title: 'Contrata closers que cierran',
+    sub: 'Encuentra closers verificados, mira sus resultados reales y su disponibilidad, y publica tus ofertas. Tú eliges y tú contactas — sin intermediarios.',
+    points: [
+      'Closers con métricas y cierres verificados',
+      'Publica ofertas y monta tu equipo',
+      'Contacta por su agenda, chat o invitación',
+    ],
+    foot: 'Acceso para empresas · cuentas verificadas',
+    cross: { to: '/', label: '¿Eres closer? Entra aquí →' },
+    demo: false,
+  },
+}
+
+export default function Landing({ variant = 'closer' }) {
+  const c = COPY[variant] || COPY.closer
   return (
     <div className="apex-ops lp" data-theme="neon">
       <AtmosphericCanvas />
       <div className="lp-wrap">
         <img className="lp-logo" src="/apex-mark.svg" alt="Apex" width={56} height={56} />
 
-        <h1 className="lp-title">El sistema operativo del closer</h1>
-        <p className="lp-sub">
-          Graba y transcribe tus llamadas de venta, no pierdas un seguimiento y recibe
-          feedback para cerrar más. Tu día, en piloto.
-        </p>
+        {variant === 'company' && <div className="lp-eyebrow">Apex · para empresas</div>}
+        <h1 className="lp-title">{c.title}</h1>
+        <p className="lp-sub">{c.sub}</p>
 
         <div className="lp-cta">
           <button className="lp-google" onClick={signInWithGoogle}>
             <GoogleIcon />
             Entrar con Google
           </button>
-          <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>
+          {c.demo && <button className="lp-demo" onClick={signInDemo}>Entrar en modo demo</button>}
         </div>
 
         <ul className="lp-points">
-          <li>Notetaker que entra a tus calls, graba y transcribe</li>
-          <li>Resumen + feedback automáticos de cada llamada</li>
-          <li>Pipeline, seguimientos y métricas en un sitio</li>
+          {c.points.map((p, i) => <li key={i}>{p}</li>)}
         </ul>
 
-        <p className="lp-foot">Acceso para closers · habla hispana</p>
+        <Link className="lp-link" to={c.cross.to}>{c.cross.label}</Link>
+        <p className="lp-foot">{c.foot}</p>
       </div>
 
       <style>{LP_CSS}</style>
@@ -79,8 +106,9 @@ const LP_CSS = `
   font-family: var(--apex-font); font-size: 13px; transition: border-color 0.18s, color 0.18s;
 }
 .lp-demo:hover { border-color: var(--apex-plat-mid); color: var(--apex-plat-hi); }
-.lp-link { background: transparent; border: 0; color: var(--apex-plat-low); font-family: var(--apex-font); font-size: 12.5px; cursor: pointer; padding: 6px; margin-top: 2px; }
+.lp-link { display: inline-block; background: transparent; border: 0; color: var(--apex-accent, var(--apex-plat-low)); font-family: var(--apex-font); font-size: 12.5px; cursor: pointer; padding: 6px; margin-top: 28px; text-decoration: none; }
 .lp-link:hover { color: var(--apex-plat-hi); }
+.lp-eyebrow { font-family: var(--apex-font-mono, var(--apex-font)); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--apex-accent, var(--apex-plat-mid)); margin-bottom: 12px; }
 .lp-form { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; }
 .lp-form-h { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--apex-plat-low); text-align: center; margin-bottom: 2px; }
 .lp-input { padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--apex-border); color: var(--apex-plat-hi); font-family: var(--apex-font); font-size: 15px; outline: none; }
