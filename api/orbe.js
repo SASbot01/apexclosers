@@ -16,6 +16,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { localChat, localLLMReady } from './_lib/localLLM.js'
+import { retrieve, ragBlock } from './_lib/coachRag.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -136,7 +137,7 @@ Tienes exactamente tres trabajos:
 2) DECIR QUÉ ESTÁ FALLANDO — señala el cuello de botella real del embudo y por qué duele, apoyándote en la sección "Qué está fallando".
 3) GUIAR PARA CERRAR MEJOR — da consejos accionables y concretos para la próxima llamada o seguimiento (qué decir, qué preguntar, cómo rebatir, cuándo pedir señal). Conecta el consejo con el dato que lo justifica.
 
-Reglas: sé breve (2-6 frases o bullets). Prioriza lo accionable. Si el usuario solo saluda, ofrécele lo que puedes hacer (métricas, diagnóstico, guía de cierre). Usa SIEMPRE los datos reales siguientes como verdad:
+Reglas: sé breve (2-6 frases o bullets). Prioriza lo accionable. Si el usuario solo saluda, ofrécele lo que puedes hacer (métricas, diagnóstico, guía de cierre). Cuando te apoyes en una llamada concreta, CÍTALA por su título/fecha (usa solo los fragmentos reales del final, no inventes). Usa SIEMPRE los datos reales siguientes como verdad:
 
 === DATOS DEL USUARIO ===
 ${metricsBlock(m)}
@@ -151,7 +152,11 @@ async function chat(req, res) {
   if (!history.length) return res.status(400).json({ error: 'messages_required' })
 
   const metrics = await computeMetrics(userId).catch(() => null)
-  const system = systemPrompt(metrics)
+  // RAG: recupera fragmentos relevantes de las transcripciones reales del closer
+  // para esta pregunta y se los damos al modelo para que CITE llamadas concretas.
+  const lastUser = [...history].reverse().find(m => m.role === 'user')?.body || ''
+  const chunks = await retrieve(userId, lastUser, 6).catch(() => [])
+  const system = systemPrompt(metrics) + ragBlock(chunks)
 
   if (!localLLMReady() && !anthropic) {
     return res.status(503).json({ error: 'no_llm_configured', reply: 'No hay LLM configurado (ni Ollama local ni Anthropic). Arranca el LLM local para activarme.' })

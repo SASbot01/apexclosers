@@ -31,6 +31,7 @@ import {
   SKILLS_SYSTEM, normalizeSkills, transcriptStats,
 } from './_lib/callAnalysis.js'
 import { notify, enqueueFollowUps } from './_lib/workflow.js'
+import { indexCall } from './_lib/coachRag.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -287,6 +288,10 @@ async function finalize(req, res) {
     started_at: row.started_at || row.scheduled_at || row.created_at || new Date().toISOString(),
     ended_at: row.ended_at || new Date().toISOString(),
   }).eq('id', row.id)
+
+  // RAG: indexa esta llamada (resumen + feedback + transcripción) para que el
+  // coach pueda recuperarla y CITARLA. Best-effort, no bloquea la respuesta.
+  indexCall({ id: row.id, user_id: row.user_id, title: row.title, started_at: row.started_at || row.scheduled_at || row.created_at, transcript, summary, feedback }).catch(() => {})
 
   // Si en la transcripción se CERRÓ una venta, la registramos en la TABLA DE
   // VENTAS como "pendiente" con TODOS los campos (producto, precio, método y tipo
