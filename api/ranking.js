@@ -13,7 +13,7 @@ import { computeApexElo } from './_lib/elo.js'
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
-    return globalRanking(req, res)
+    return await globalRanking(req, res)
   } catch (e) {
     console.error('[ranking]', e)
     return res.status(500).json({ error: e.message || 'internal_error' })

@@ -8,9 +8,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'create' : 'list')
   try {
-    if (action === 'list')   return listClients(req, res)
-    if (action === 'create') return createClient(req, res)
-    if (action === 'delete') return deleteClient(req, res)
+    if (action === 'list')   return await listClients(req, res)
+    if (action === 'create') return await createClient(req, res)
+    if (action === 'delete') return await deleteClient(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[clients]', action, e)

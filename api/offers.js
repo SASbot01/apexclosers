@@ -12,9 +12,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'create' : 'list')
   try {
-    if (action === 'list')   return listOffers(req, res)
-    if (action === 'create') return createOffer(req, res)
-    if (action === 'delete') return deleteOffer(req, res)
+    if (action === 'list')   return await listOffers(req, res)
+    if (action === 'create') return await createOffer(req, res)
+    if (action === 'delete') return await deleteOffer(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[offers]', action, e)

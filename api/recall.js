@@ -32,6 +32,7 @@ import {
 } from './_lib/callAnalysis.js'
 import { notify, enqueueFollowUps } from './_lib/workflow.js'
 import { indexCall } from './_lib/coachRag.js'
+import { writeCallMemories } from './_lib/memory.js'
 import { detectProject } from './_lib/projectDetector.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -63,13 +64,13 @@ export default async function handler(req, res) {
   const action = req.query.action
   try {
     switch (action) {
-      case 'start':     return startAdHoc(req, res)
-      case 'webhook':   return handleWebhook(req, res)
-      case 'finalize':  return finalize(req, res)
-      case 'list':      return listCalls(req, res)
-      case 'get':       return getCall(req, res)
-      case 'reconcile': return reconcileBot(req, res)
-      case 'reconcile-stuck': return reconcileStuck(req, res)
+      case 'start':     return await startAdHoc(req, res)
+      case 'webhook':   return await handleWebhook(req, res)
+      case 'finalize':  return await finalize(req, res)
+      case 'list':      return await listCalls(req, res)
+      case 'get':       return await getCall(req, res)
+      case 'reconcile': return await reconcileBot(req, res)
+      case 'reconcile-stuck': return await reconcileStuck(req, res)
       default:          return res.status(400).json({ error: `unknown_action: ${action}` })
     }
   } catch (e) {
@@ -105,13 +106,20 @@ async function startAdHoc(req, res) {
 // ── webhook ──────────────────────────────────────────────────────────────
 async function handleWebhook(req, res) {
   const body = req.body || {}
+  // Verificación opcional: si RECALL_WEBHOOK_SECRET está configurado, exige que
+  // el webhook traiga ese secreto (header o query). Sin env → no se exige (compat).
+  const wantSecret = process.env.RECALL_WEBHOOK_SECRET
+  if (wantSecret) {
+    const got = req.headers['x-recall-secret'] || req.query.secret
+    if (got !== wantSecret) return res.status(401).json({ error: 'unauthorized' })
+  }
   const event = body.event
   const data  = body.data || {}
   const botId = data.bot_id || data.id
   if (!botId) return res.status(200).json({ ok: true, ignored: 'no_bot_id' })
 
   const { data: row } = await supabase
-    .from('calls').select('id, user_id, raw_webhook_events, transcript')
+    .from('calls').select('id, user_id, raw_webhook_events, transcript, started_at')
     .eq('bot_id', botId).maybeSingle()
   if (!row) return res.status(200).json({ ok: true, ignored: 'bot_not_found' })
 
@@ -123,7 +131,7 @@ async function handleWebhook(req, res) {
 
   if (event === 'bot.status_change') {
     patch.status = data?.status?.code || 'scheduled'
-    if (patch.status === 'in_call_recording') patch.started_at = patch.started_at || new Date().toISOString()
+    if (patch.status === 'in_call_recording' && !row.started_at) patch.started_at = new Date().toISOString()
   }
   if (event === 'transcript.data') {
     const words = data?.data?.words || []
@@ -296,6 +304,9 @@ async function finalize(req, res) {
   // coach pueda recuperarla y CITARLA. Best-effort, no bloquea la respuesta.
   indexCall({ id: row.id, user_id: row.user_id, title: row.title, started_at: row.started_at || row.scheduled_at || row.created_at, transcript, summary, feedback }).catch(() => {})
 
+  // Memoria persistente: deriva hechos del negocio del closer y el resultado de la call.
+  writeCallMemories(row.user_id, { id: row.id, started_at: row.started_at || row.scheduled_at || row.created_at }, outcomeData).catch(() => {})
+
   // 🧠 PROYECTO de la llamada (IA): si el closer lleva varios clientes, deduce a
   // cuál pertenece esta llamada (título + asistentes + cuenta + transcripción) y
   // lo fija en la llamada, la venta y el lead. Si ya venía marcado, se respeta.
@@ -307,7 +318,6 @@ async function finalize(req, res) {
         projectKey = det.key
         if (UUID_RE.test(projectKey)) await supabase.from('calls').update({ client_id: projectKey }).eq('id', row.id)
         if (row.calendar_event_id) await supabase.from('leads').update({ project: projectKey }).eq('owner_id', row.user_id).eq('calendar_event_id', row.calendar_event_id)
-        console.log(`[finalize] proyecto detectado (${det.method}, conf ${det.confidence}): ${det.name}`)
       }
     }
   } catch (e) { console.error('[finalize] project detect failed', e.message) }

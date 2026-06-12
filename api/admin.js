@@ -21,10 +21,10 @@ export default async function handler(req, res) {
   if (!admin) return res.status(403).json({ error: 'forbidden' })
   const action = req.query.action || 'list-users'
   try {
-    if (action === 'list-users')  return listUsers(req, res)
-    if (action === 'set-access')  return setAccess(req, res, admin)
-    if (action === 'set-type')    return setType(req, res, admin)
-    if (action === 'delete-user') return deleteUser(req, res, admin)
+    if (action === 'list-users')  return await listUsers(req, res)
+    if (action === 'set-access')  return await setAccess(req, res, admin)
+    if (action === 'set-type')    return await setType(req, res, admin)
+    if (action === 'delete-user') return await deleteUser(req, res, admin)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[admin]', action, e)

@@ -17,6 +17,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { localChat, localLLMReady } from './_lib/localLLM.js'
 import { retrieve, ragBlock } from './_lib/coachRag.js'
+import { knowledgeBlock } from './_lib/domainKnowledge.js'
+import { recallMemories, captureExplicit } from './_lib/memory.js'
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -27,12 +29,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || 'chat'
   try {
-    if (action === 'chat')            return chat(req, res)
-    if (action === 'metrics')         return metricsEndpoint(req, res)
-    if (action === 'optimize-script') return optimizeScript(req, res)
-    if (action === 'roleplay')        return roleplay(req, res)
-    if (action === 'roleplay-eval')   return roleplayEval(req, res)
-    if (action === 'live-support')    return liveSupport(req, res)
+    if (action === 'chat')            return await chat(req, res)
+    if (action === 'metrics')         return await metricsEndpoint(req, res)
+    if (action === 'optimize-script') return await optimizeScript(req, res)
+    if (action === 'roleplay')        return await roleplay(req, res)
+    if (action === 'roleplay-eval')   return await roleplayEval(req, res)
+    if (action === 'live-support')    return await liveSupport(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[orbe]', action, e)
@@ -69,11 +71,11 @@ async function computeMetrics(userId) {
   const offerRate = held.length ? offers.length / held.length : null
 
   const L = leads || []
-  const openLeads = L.filter(l => l.stage !== 'cerrado')
+  const openLeads = L.filter(l => l.stage !== 'cerrado' && l.stage !== 'cerrada')
   const pipeline  = openLeads.reduce((a, l) => a + (Number(l.value) || 0), 0)
-  const stale     = L.filter(l => l.last_at && (Date.now() - new Date(l.last_at).getTime()) > 7 * 86400 * 1000 && l.stage !== 'cerrado')
-  const hot       = L.filter(l => (l.tags || []).includes('caliente') && l.stage !== 'cerrado')
-  const dueFollow = L.filter(l => l.next_at && new Date(l.next_at).getTime() <= Date.now() && l.stage !== 'cerrado')
+  const stale     = L.filter(l => l.last_at && (Date.now() - new Date(l.last_at).getTime()) > 7 * 86400 * 1000 && l.stage !== 'cerrado' && l.stage !== 'cerrada')
+  const hot       = L.filter(l => (l.tags || []).includes('caliente') && l.stage !== 'cerrado' && l.stage !== 'cerrada')
+  const dueFollow = L.filter(l => l.next_at && new Date(l.next_at).getTime() <= Date.now() && l.stage !== 'cerrado' && l.stage !== 'cerrada')
 
   // Qué está fallando — cuellos de botella detectados por umbral.
   const issues = []
@@ -156,7 +158,10 @@ async function chat(req, res) {
   // para esta pregunta y se los damos al modelo para que CITE llamadas concretas.
   const lastUser = [...history].reverse().find(m => m.role === 'user')?.body || ''
   const chunks = await retrieve(userId, lastUser, 6).catch(() => [])
-  const system = systemPrompt(metrics) + ragBlock(chunks)
+  // Memoria persistente: recupera lo que sabemos del closer y captura "recuerda que…".
+  const memBlock = await recallMemories(userId, lastUser, 5).catch(() => '')
+  if (lastUser) captureExplicit(userId, lastUser).then(() => {}, () => {})
+  const system = systemPrompt(metrics) + knowledgeBlock({ metrics: true, crm: true, workshop: true }) + ragBlock(chunks) + memBlock
 
   if (!localLLMReady() && !anthropic) {
     return res.status(503).json({ error: 'no_llm_configured', reply: 'No hay LLM configurado (ni Ollama local ni Anthropic). Arranca el LLM local para activarme.' })

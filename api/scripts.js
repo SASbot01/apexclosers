@@ -13,10 +13,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'save' : 'get')
   try {
-    if (action === 'get')         return getScript(req, res)
-    if (action === 'save')        return saveScript(req, res)
-    if (action === 'results')     return listResults(req, res)
-    if (action === 'save-result') return saveResult(req, res)
+    if (action === 'get')         return await getScript(req, res)
+    if (action === 'save')        return await saveScript(req, res)
+    if (action === 'results')     return await listResults(req, res)
+    if (action === 'save-result') return await saveResult(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[scripts]', action, e)

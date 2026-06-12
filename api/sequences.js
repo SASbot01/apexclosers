@@ -18,10 +18,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'GET' ? 'list' : 'upsert')
   try {
-    if (action === 'list')   return listSeq(req, res)
-    if (action === 'upsert') return upsertSeq(req, res)
-    if (action === 'delete') return delSeq(req, res)
-    if (action === 'tasks')  return listTasks(req, res)
+    if (action === 'list')   return await listSeq(req, res)
+    if (action === 'upsert') return await upsertSeq(req, res)
+    if (action === 'delete') return await delSeq(req, res)
+    if (action === 'tasks')  return await listTasks(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[sequences]', action, e)

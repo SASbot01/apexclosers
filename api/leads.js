@@ -10,6 +10,7 @@
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { detectProject } from './_lib/projectDetector.js'
+import { toNum } from './_lib/num.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -17,10 +18,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'GET' ? 'list' : 'upsert')
   try {
-    if (action === 'list')   return listLeads(req, res)
-    if (action === 'upsert') return upsertLead(req, res)
-    if (action === 'delete') return deleteLead(req, res)
-    if (action === 'detect-project') return detectLeadProject(req, res)
+    if (action === 'list')   return await listLeads(req, res)
+    if (action === 'upsert') return await upsertLead(req, res)
+    if (action === 'delete') return await deleteLead(req, res)
+    if (action === 'detect-project') return await detectLeadProject(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[leads]', action, e)
@@ -37,7 +38,7 @@ function toRow(lead, userId) {
     email:     lead.email ?? null,
     phone:     lead.phone ?? null,
     company:   lead.company ?? null,
-    value:     lead.value === '' || lead.value == null ? null : Number(lead.value),
+    value:     lead.value === '' || lead.value == null ? null : toNum(lead.value, null),
     stage:     lead.stage ?? 'nuevo',
     source:    lead.source ?? null,
     tags:      Array.isArray(lead.tags) ? lead.tags : [],

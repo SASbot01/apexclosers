@@ -11,9 +11,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'read' : 'list')
   try {
-    if (action === 'list')     return listNotif(req, res)
-    if (action === 'read')     return markRead(req, res)
-    if (action === 'read-all') return markAll(req, res)
+    if (action === 'list')     return await listNotif(req, res)
+    if (action === 'read')     return await markRead(req, res)
+    if (action === 'read-all') return await markAll(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[notifications]', action, e)

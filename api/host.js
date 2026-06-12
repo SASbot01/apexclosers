@@ -18,11 +18,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'save' : 'page')
   try {
-    if (action === 'page')   return getPage(req, res)
-    if (action === 'save')   return savePage(req, res)
-    if (action === 'public') return publicPage(req, res)
-    if (action === 'slots')  return slots(req, res)
-    if (action === 'book')   return book(req, res)
+    if (action === 'page')   return await getPage(req, res)
+    if (action === 'save')   return await savePage(req, res)
+    if (action === 'public') return await publicPage(req, res)
+    if (action === 'slots')  return await slots(req, res)
+    if (action === 'book')   return await book(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[host]', action, e)
@@ -164,6 +164,29 @@ async function hostAccount(page) {
   return data || null
 }
 
+// Cuentas Google ACTIVAS del usuario (varias). El busy unificado evita solapar
+// citas entre cuentas distintas (p. ej. agendar en una cuenta libre un hueco que
+// ya está ocupado en otra).
+async function activeAccounts(userId) {
+  const { data } = await supabase.from('google_accounts').select('*').eq('user_id', userId).eq('active', true)
+  return data || []
+}
+
+// Intervalos ocupados en [from,to] uniendo el free/busy de TODAS las cuentas
+// activas del usuario (cada cuenta por separado, tolerando fallos por cuenta).
+// `extra` garantiza incluir la cuenta host aunque esté marcada como inactiva
+// (es donde aterrizan las reservas, así que SIEMPRE debe comprobarse).
+async function allBusyIntervals(userId, fromUtc, toUtc, extra = null) {
+  const accounts = await activeAccounts(userId)
+  if (extra && !accounts.some(a => a.id === extra.id)) accounts.push(extra)
+  const out = []
+  for (const acc of accounts) {
+    try { for (const iv of await busyIntervals(acc, fromUtc, toUtc)) out.push(iv) }
+    catch (e) { console.error('[host] freebusy', acc.email, e.message) }
+  }
+  return out
+}
+
 // Intervalos ocupados (Google free/busy) de TODOS los calendarios visibles de la
 // cuenta host, en [from,to].
 async function busyIntervals(account, fromUtc, toUtc) {
@@ -215,12 +238,10 @@ async function slots(req, res) {
   }
   if (!candidates.length) return res.status(200).json({ slots: [], timezone: tz })
 
-  // Ocupado en Google ese día.
+  // Ocupado en Google ese día (todas las cuentas activas + la cuenta host).
   const dayFrom = new Date(Math.min(...candidates))
   const dayTo = new Date(Math.max(...candidates) + duration * 60000)
-  let busy = []
-  const account = await hostAccount(page)
-  try { busy = await busyIntervals(account, dayFrom, dayTo) } catch (e) { console.error('[host] freebusy', e.message) }
+  const busy = await allBusyIntervals(page.user_id, dayFrom, dayTo, await hostAccount(page))
 
   const free = candidates.filter(ms => {
     const s = ms - buffer * 60000, e = ms + (duration + buffer) * 60000
@@ -245,7 +266,7 @@ async function book(req, res) {
   // Revalida que el hueco siga libre (carrera entre dos reservas).
   const account = await hostAccount(page)
   if (!account) return res.status(409).json({ error: 'host_calendar_unavailable' })
-  const busy = await busyIntervals(account, new Date(start.getTime() - 1), new Date(end.getTime() + 1)).catch(() => [])
+  const busy = await allBusyIntervals(page.user_id, new Date(start.getTime() - 1), new Date(end.getTime() + 1), account)
   if (busy.some(([bs, be]) => start.getTime() < be && end.getTime() > bs)) return res.status(409).json({ error: 'slot_taken' })
 
   // Crea el evento en el calendario del host (con Meet si aplica).

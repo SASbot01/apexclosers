@@ -11,8 +11,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'add-entry' : 'list')
   try {
-    if (action === 'list')      return listReports(req, res)
-    if (action === 'add-entry') return addEntry(req, res)
+    if (action === 'list')      return await listReports(req, res)
+    if (action === 'add-entry') return await addEntry(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[reports]', action, e)

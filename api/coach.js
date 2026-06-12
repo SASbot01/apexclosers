@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || 'status'
   try {
-    if (action === 'reindex') return reindex(req, res)
-    if (action === 'status')  return status(req, res)
+    if (action === 'reindex') return await reindex(req, res)
+    if (action === 'status')  return await status(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[coach]', action, e)

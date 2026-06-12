@@ -30,8 +30,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'visibility' : 'metrics')
   try {
-    if (action === 'metrics')    return getMetrics(req, res)
-    if (action === 'visibility') return req.method === 'POST' ? setVisibility(req, res) : getVisibility(req, res)
+    if (action === 'metrics')    return await getMetrics(req, res)
+    if (action === 'visibility') return await (req.method === 'POST' ? setVisibility(req, res) : getVisibility(req, res))
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[metrics]', action, e)
@@ -71,7 +71,7 @@ export async function computeUserMetrics(userId, clientKey = null) {
   const noShow  = C.filter(c => c.outcome === 'no_show').length
   const offers  = C.filter(c => c.offer_made).length
   const won     = C.filter(c => c.outcome === 'won' || c.deal_closed).length
-  const pipeline = L.filter(l => l.stage !== 'cerrado').reduce((a, l) => a + (Number(l.value) || 0), 0)
+  const pipeline = L.filter(l => l.stage !== 'cerrado' && l.stage !== 'cerrada').reduce((a, l) => a + (Number(l.value) || 0), 0)
 
   return {
     revenue,
@@ -95,7 +95,7 @@ async function visibilityMap(userId) {
 
 async function getMetrics(req, res) {
   const userId = req.query.userId
-  const viewerId = req.query.viewerId || userId
+  const viewerId = req.query.viewerId || null
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const isOwner = viewerId === userId

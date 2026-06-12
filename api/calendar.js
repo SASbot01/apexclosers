@@ -19,10 +19,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action
   try {
-    if (action === 'events') return listEvents(req, res)
-    if (action === 'sync') return sync(req, res)
-    if (action === 'create') return createEvent(req, res)
-    if (action === 'schedule-bots') return scheduleBots(req, res)
+    if (action === 'events') return await listEvents(req, res)
+    if (action === 'sync') return await sync(req, res)
+    if (action === 'create') return await createEvent(req, res)
+    if (action === 'schedule-bots') return await scheduleBots(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[calendar]', action, e)
@@ -277,7 +277,7 @@ async function createEvent(req, res) {
   let acc = null
   if (accountId) { const { data } = await supabase.from('google_accounts').select('*').eq('id', accountId).eq('user_id', userId).maybeSingle(); acc = data }
   if (!acc) acc = await getPrimaryAccount(userId)
-  if (!acc) return res.status(200).json({ error: 'google_not_connected' })
+  if (!acc) return res.status(409).json({ error: 'google_not_connected' })
   const token = await freshToken(acc)
   const body = {
     summary: summary || 'Llamada',

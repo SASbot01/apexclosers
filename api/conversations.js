@@ -12,9 +12,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'upsert' : 'list')
   try {
-    if (action === 'list')   return listConversations(req, res)
-    if (action === 'upsert') return upsertConversation(req, res)
-    if (action === 'delete') return deleteConversation(req, res)
+    if (action === 'list')   return await listConversations(req, res)
+    if (action === 'upsert') return await upsertConversation(req, res)
+    if (action === 'delete') return await deleteConversation(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[conversations]', action, e)
@@ -55,6 +55,7 @@ async function deleteConversation(req, res) {
   const { userId } = req.body || {}
   const id = req.query.id
   if (!userId || !id) return res.status(400).json({ error: 'userId_and_id_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const { error } = await supabase.from('conversations').delete().eq('id', id).eq('owner_id', userId)
   if (error) throw new Error(error.message)
   return res.status(200).json({ ok: true })

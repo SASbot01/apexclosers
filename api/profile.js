@@ -19,13 +19,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'update' : 'get')
   try {
-    if (action === 'get')          return getProfile(req, res)
-    if (action === 'by-nick')      return getByNick(req, res)
-    if (action === 'update')       return updateProfile(req, res)
-    if (action === 'set-status')   return setStatus(req, res)
-    if (action === 'upload-photo') return uploadPhoto(req, res)
-    if (action === 'search')       return search(req, res)
-    if (action === 'cv')           return cv(req, res)
+    if (action === 'get')          return await getProfile(req, res)
+    if (action === 'by-nick')      return await getByNick(req, res)
+    if (action === 'update')       return await updateProfile(req, res)
+    if (action === 'set-status')   return await setStatus(req, res)
+    if (action === 'upload-photo') return await uploadPhoto(req, res)
+    if (action === 'search')       return await search(req, res)
+    if (action === 'cv')           return await cv(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[profile]', action, e)
@@ -70,7 +70,7 @@ async function isTeamMember(ownerId, viewerId, clientKey) {
   const { data: teams } = await supabase.from('teams').select('id').eq('owner_id', ownerId).eq('client_key', clientKey)
   const ids = (teams || []).map(t => t.id)
   if (!ids.length) return false
-  const { data } = await supabase.from('team_members').select('team_id').eq('user_id', viewerId).in('team_id', ids).limit(1)
+  const { data } = await supabase.from('team_members').select('team_id').eq('user_id', viewerId).eq('status', 'accepted').in('team_id', ids).limit(1)
   return !!(data && data.length)
 }
 

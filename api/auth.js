@@ -51,19 +51,19 @@ export default async function handler(req, res) {
   const action = req.query.action
   try {
     switch (action) {
-      case 'google-start':    return googleStart(req, res)
-      case 'google-callback': return googleCallback(req, res)
-      case 'me':              return me(req, res)
-      case 'integrations':    return integrations(req, res)
-      case 'google-accounts':       return googleAccounts(req, res)
-      case 'google-account-update': return googleAccountUpdate(req, res)
-      case 'google-account-remove': return googleAccountRemove(req, res)
-      case 'client-login':    return passwordLogin(req, res)
-      case 'password-login':  return passwordLogin(req, res)
-      case 'admin-login':     return passwordLogin(req, res)
-      case 'create-client':   return createAccount(req, res)
-      case 'create-account':  return createAccount(req, res)
-      case 'logout':          return logout(req, res)
+      case 'google-start':    return await googleStart(req, res)
+      case 'google-callback': return await googleCallback(req, res)
+      case 'me':              return await me(req, res)
+      case 'integrations':    return await integrations(req, res)
+      case 'google-accounts':       return await googleAccounts(req, res)
+      case 'google-account-update': return await googleAccountUpdate(req, res)
+      case 'google-account-remove': return await googleAccountRemove(req, res)
+      case 'client-login':    return await passwordLogin(req, res)
+      case 'password-login':  return await passwordLogin(req, res)
+      case 'admin-login':     return await passwordLogin(req, res)
+      case 'create-client':   return await createAccount(req, res)
+      case 'create-account':  return await createAccount(req, res)
+      case 'logout':          return await logout(req, res)
       default:                return res.status(400).json({ error: `unknown_action: ${action}` })
     }
   } catch (e) {
@@ -138,8 +138,14 @@ async function googleCallback(req, res) {
   const { data: user } = await supabase
     .from('users')
     .upsert({ google_sub: ui.sub, email: ui.email, name: ui.name || null, picture: ui.picture || null }, { onConflict: 'email' })
-    .select('id, email, name, picture')
+    .select('id, email, name, picture, access')
     .single()
+
+  // Si el admin bloqueó la cuenta, no creamos sesión (igual que passwordLogin).
+  if (user?.access === 'blocked') {
+    res.writeHead(302, { Location: `${baseUrl(req)}/?error=blocked` })
+    return res.end()
+  }
 
   // 3b) AFILIADOS: si vino con ?ref= (en el OAuth state) y es un registro NUEVO,
   // anota que ese afiliado lo trajo (unique(referred_id) evita duplicados).

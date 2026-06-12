@@ -24,10 +24,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || 'summary'
   try {
-    if (action === 'summary')   return summary(req, res)
-    if (action === 'chats')     return listChats(req, res)
-    if (action === 'chat-save') return saveChat(req, res)
-    if (action === 'chat-del')  return delChat(req, res)
+    if (action === 'summary')   return await summary(req, res)
+    if (action === 'chats')     return await listChats(req, res)
+    if (action === 'chat-save') return await saveChat(req, res)
+    if (action === 'chat-del')  return await delChat(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[workshop]', action, e)
@@ -160,7 +160,7 @@ async function summary(req, res) {
   const wonC     = calls.filter(c => c.outcome === 'won' || c.deal_closed).length
   const objCalls = calls.filter(c => Array.isArray(c.objections) && c.objections.length)
   const wonObjC  = objCalls.filter(c => c.outcome === 'won' || c.deal_closed).length
-  const openLeads  = leads.filter(l => l.stage !== 'cerrado')
+  const openLeads  = leads.filter(l => l.stage !== 'cerrado' && l.stage !== 'cerrada')
   const staleLeads = openLeads.filter(l => !l.last_at || (Date.now() - new Date(l.last_at).getTime()) > 7 * 86400 * 1000)
   // apertura=show rate · descubrimiento=tasa de oferta · propuesta=compromiso
   // (cierres+depósitos / ofertas) · objeciones=cierre con objeción · cierre=close

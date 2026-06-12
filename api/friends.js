@@ -20,27 +20,27 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action
   try {
-    if (action === 'list')         return listFriends(req, res)
-    if (action === 'invite')       return invite(req, res)
-    if (action === 'respond')      return respond(req, res)
-    if (action === 'remove')       return removeFriend(req, res)
-    if (action === 'groups')       return listGroups(req, res)
-    if (action === 'group-create') return groupCreate(req, res)
-    if (action === 'group-delete') return groupDelete(req, res)
-    if (action === 'group-add')    return groupAdd(req, res)
-    if (action === 'group-remove') return groupRemove(req, res)
-    if (action === 'teams')        return listTeams(req, res)
-    if (action === 'team-create')  return teamCreate(req, res)
-    if (action === 'team-delete')  return teamDelete(req, res)
-    if (action === 'team-add')     return teamInvite(req, res)
-    if (action === 'team-invite')  return teamInvite(req, res)
-    if (action === 'team-remove')  return teamRemove(req, res)
-    if (action === 'team-invites') return teamInvites(req, res)   // pendientes del closer
-    if (action === 'team-respond') return teamRespond(req, res)   // closer acepta/rechaza
-    if (action === 'my-teams')     return myTeams(req, res)       // equipos donde está el closer
-    if (action === 'team-chat')      return teamChatList(req, res)
-    if (action === 'team-chat-send') return teamChatSend(req, res)
-    if (action === 'company-crm')    return companyCrm(req, res)     // CRM de empresa
+    if (action === 'list')         return await listFriends(req, res)
+    if (action === 'invite')       return await invite(req, res)
+    if (action === 'respond')      return await respond(req, res)
+    if (action === 'remove')       return await removeFriend(req, res)
+    if (action === 'groups')       return await listGroups(req, res)
+    if (action === 'group-create') return await groupCreate(req, res)
+    if (action === 'group-delete') return await groupDelete(req, res)
+    if (action === 'group-add')    return await groupAdd(req, res)
+    if (action === 'group-remove') return await groupRemove(req, res)
+    if (action === 'teams')        return await listTeams(req, res)
+    if (action === 'team-create')  return await teamCreate(req, res)
+    if (action === 'team-delete')  return await teamDelete(req, res)
+    if (action === 'team-add')     return await teamInvite(req, res)
+    if (action === 'team-invite')  return await teamInvite(req, res)
+    if (action === 'team-remove')  return await teamRemove(req, res)
+    if (action === 'team-invites') return await teamInvites(req, res)   // pendientes del closer
+    if (action === 'team-respond') return await teamRespond(req, res)   // closer acepta/rechaza
+    if (action === 'my-teams')     return await myTeams(req, res)       // equipos donde está el closer
+    if (action === 'team-chat')      return await teamChatList(req, res)
+    if (action === 'team-chat-send') return await teamChatSend(req, res)
+    if (action === 'company-crm')    return await companyCrm(req, res)     // CRM de empresa
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[friends]', action, e)
@@ -253,9 +253,9 @@ async function myTeams(req, res) {
   const { data: mems } = await supabase.from('team_members').select('team_id').eq('user_id', userId).eq('status', 'accepted')
   const tids = [...new Set((mems || []).map(m => m.team_id))]
   if (!tids.length) return res.status(200).json({ teams: [] })
-  const { data: teams } = await supabase.from('teams').select('id, name, emoji, owner_id').in('id', tids)
+  const { data: teams } = await supabase.from('teams').select('id, name, emoji, owner_id, client_key').in('id', tids)
   const owners = await cardsFor((teams || []).map(t => t.owner_id))
-  return res.status(200).json({ teams: (teams || []).map(t => ({ id: t.id, name: t.name, emoji: t.emoji, company: owners[t.owner_id] || null })) })
+  return res.status(200).json({ teams: (teams || []).map(t => ({ id: t.id, name: t.name, emoji: t.emoji, client_key: t.client_key, company: owners[t.owner_id] || null })) })
 }
 
 // Invitaciones de equipo PENDIENTES del closer (recuadro en su perfil).

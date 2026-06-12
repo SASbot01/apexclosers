@@ -718,8 +718,11 @@ function TeamsPanel({ onOpenMember, clients = [] }) {
             {mine.map(t => (
               <div key={t.id}>
                 <div className="pf-friend">
-                  <FriendAvatar p={t.company || { display_name: t.name }} />
-                  <div className="pf-friend-id"><span className="pf-friend-name">{t.emoji} {t.name}</span><span className="pf-friend-nick">{t.company?.display_name || ''}</span></div>
+                  <div onClick={() => t.company?.user_id && onOpenMember(t.company.user_id, t.client_key || '')} style={{ display: 'contents', cursor: t.company?.user_id ? 'pointer' : 'default' }}>
+                    <FriendAvatar p={t.company || { display_name: t.name }} />
+                    <div className="pf-friend-id" style={{ cursor: t.company?.user_id ? 'pointer' : 'default' }} title={t.company?.user_id ? `Ver el perfil de ${t.company.display_name || 'la empresa'}` : ''}><span className="pf-friend-name">{t.emoji} {t.name}</span><span className="pf-friend-nick">{t.company?.display_name || ''}</span></div>
+                  </div>
+                  {t.company?.user_id && <button className="sales-mini sales-mini--go" onClick={() => onOpenMember(t.company.user_id, t.client_key || '')} title="Ver el perfil de la empresa">Ver empresa →</button>}
                   <button className="sales-mini sales-mini--go" onClick={() => setChatTeam(chatTeam === t.id ? null : t.id)}>{chatTeam === t.id ? 'Cerrar chat' : 'Chat'}</button>
                 </div>
                 {chatTeam === t.id && <TeamChat teamId={t.id} title={`Chat · ${t.name}`} />}

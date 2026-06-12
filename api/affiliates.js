@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || 'summary'
   try {
-    if (action === 'summary') return summary(req, res)
+    if (action === 'summary') return await summary(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[affiliates]', action, e)

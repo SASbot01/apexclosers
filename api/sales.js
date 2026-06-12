@@ -16,6 +16,7 @@
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
 import { notify } from './_lib/workflow.js'
+import { toNum } from './_lib/num.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PROOF_BUCKET = 'proofs'
@@ -24,11 +25,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'GET' ? 'list' : 'upsert')
   try {
-    if (action === 'list')         return listSales(req, res)
-    if (action === 'upsert')       return upsertSale(req, res)
-    if (action === 'delete')       return deleteSale(req, res)
-    if (action === 'upload-proof') return uploadProof(req, res)
-    if (action === 'verify')       return verifySale(req, res)
+    if (action === 'list')         return await listSales(req, res)
+    if (action === 'upsert')       return await upsertSale(req, res)
+    if (action === 'delete')       return await deleteSale(req, res)
+    if (action === 'upload-proof') return await uploadProof(req, res)
+    if (action === 'verify')       return await verifySale(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[sales]', action, e)
@@ -44,8 +45,8 @@ function toRow(sale, userId) {
     date:           sale.date || new Date().toISOString(),
     closer:         sale.closer ?? null,
     product:        sale.product ?? null,
-    revenue:        Number(sale.revenue || 0),
-    cash_collected: Number(sale.cash_collected || 0),
+    revenue:        toNum(sale.revenue, 0),
+    cash_collected: toNum(sale.cash_collected, 0),
     payment_method: sale.payment_method ?? null,
     payment_type:   sale.payment_type || 'Pago único',
     source:         sale.source || 'manual',

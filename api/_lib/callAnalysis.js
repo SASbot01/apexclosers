@@ -6,6 +6,7 @@
 // el modelo (sobre todo los 7B locales).
 
 import { supabase } from './supabase.js'
+import { knowledgeBlock } from './domainKnowledge.js'
 
 const KNOWN_METHODS = ['Stripe', 'Transferencia', 'Tarjeta', 'PayPal', 'Bizum', 'Crypto', 'Financiación', 'Efectivo']
 
@@ -231,8 +232,9 @@ BLOQUE 2 — FEEDBACK (markdown):
 Sin emojis. Sin exclamaciones. Tono de socio con 15 años de oficio.`
 
 export function summarySystem(coaching) {
-  if (!coaching) return BASE_SUMMARY
-  return `${BASE_SUMMARY}
+  const ground = knowledgeBlock({ metrics: true })
+  if (!coaching) return BASE_SUMMARY + ground
+  return `${BASE_SUMMARY}${ground}
 
 CONTEXTO DEL CLOSER (sus llamadas anteriores). Úsalo para dar feedback que MEJORA con el tiempo: si un patrón se repite (p. ej. se cae siempre en la misma objeción), dilo explícitamente y dale UNA acción concreta para romperlo; reconoce también lo que ya hace bien de forma consistente.
 ${coaching}`
@@ -264,6 +266,12 @@ export async function buildCoachingContext(userId) {
     const lines = [`- Últimas ${C.length} llamadas con resultado: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')}.`]
     if (closeRate != null) lines.push(`- Close rate reciente (de ofertas): ${closeRate}%.`)
     if (topObj.length) lines.push(`- Objeciones recurrentes: ${topObj.join(', ')}.`)
+    try {
+      const { data: mem } = await supabase.from('memories').select('content')
+        .eq('user_id', userId).eq('type', 'semantic')
+        .order('salience', { ascending: false }).limit(3)
+      if (mem && mem.length) lines.push(`- Lo que sabemos de su negocio: ${mem.map(x => x.content).join(' | ')}.`)
+    } catch { /* memoria opcional (migración 0020); si falta, se ignora */ }
     return lines.join('\n')
   } catch (e) {
     console.error('[callAnalysis] coaching context failed', e.message)

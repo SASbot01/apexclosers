@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   const action = req.query.action || (req.method === 'POST' ? 'set' : 'get')
   try {
-    if (action === 'get') return getGoals(req, res)
-    if (action === 'set') return setGoals(req, res)
+    if (action === 'get') return await getGoals(req, res)
+    if (action === 'set') return await setGoals(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[goals]', action, e)
@@ -29,6 +29,7 @@ async function getGoals(req, res) {
 async function setGoals(req, res) {
   const { userId, goals } = req.body || {}
   if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
   const row = {
     user_id: userId,
     calls: Number(goals?.calls) || 0,

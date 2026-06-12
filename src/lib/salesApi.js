@@ -40,7 +40,7 @@ export const verifySale  = (id)     => call('/api/sales', 'verify', { method: 'P
 export const uploadProof = (id, proof, filename) => call('/api/sales', 'upload-proof', { method: 'POST', body: { userId: getUserId(), id, proof, filename } }).then(d => d.sale)
 
 // ── Métricas ──
-export const getMetrics    = (viewerId) => call('/api/metrics', 'metrics', { query: { userId: getUserId(), ...(viewerId ? { viewerId } : {}) } })
+export const getMetrics    = (viewerId) => call('/api/metrics', 'metrics', { query: { userId: getUserId(), viewerId: viewerId || getUserId() } })
 export const getVisibility  = () => call('/api/metrics', 'visibility', { query: { userId: getUserId() } }).then(d => d.visibility || {})
 export const setVisibility  = (visible) => call('/api/metrics', 'visibility', { method: 'POST', body: { userId: getUserId(), visible } })
 
