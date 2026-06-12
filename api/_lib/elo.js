@@ -1,20 +1,23 @@
 // Apex Elo — rating COMPUESTO de un closer derivado de TODAS sus métricas reales
-// (resultado, eficiencia, habilidad del workshop y consistencia), llevado a una
-// escala Elo mediante un modelo de "partidos" todos-contra-todos, con
-// DECAIMIENTO POR INACTIVIDAD: a partir de 7 días sin actividad el rating cae,
-// de modo que cualquier closer activo termina adelantando al inactivo. Un closer
-// totalmente inactivo (>30 días o sin datos) nunca se sostiene por encima de uno
-// activo.
+// (resultado, eficiencia, habilidad del workshop y consistencia). EMPIEZA EN 0 y
+// SE GANA: sin llamadas reales el Elo es 0. La forma efectiva (0..1) se lleva a
+// puntos con tres palancas:
+//   1) FORMA: media ponderada de todas las métricas (pesos abajo).
+//   2) FIABILIDAD: pocas llamadas valen poco (1 llamada no puede valer como 50);
+//      sube con el volumen real hasta el tope FULL_CONF.
+//   3) ACTIVIDAD: decae con la inactividad (a los 7 días empieza a bajar, a los 30
+//      es inactivo "duro"), así un activo siempre termina adelantando al parado.
+// Para entrar al ranking hace falta un mínimo de llamadas (MIN_CALLS) o un cierre;
+// por debajo de eso, Elo = 0.
 //
 // Es determinista (sin azar): mismas métricas → mismo Elo. La función pura recibe
 // las estadísticas crudas por closer y devuelve { ratings, byId }.
 
 const INACTIVE_DAYS = 7      // a partir de aquí empieza a decaer
 const DEAD_DAYS = 30         // a partir de aquí se considera inactivo "duro"
-const BASE = 1500            // Elo de partida
-const SCALE = 6              // cuánto separa el rating una diferencia de forma
-const K = 28                 // factor de aprendizaje del round-robin
-const PASSES = 16            // iteraciones hasta converger
+const ELO_SCALE = 2500       // forma efectiva (0..1) → puntos Elo (0..2500)
+const MIN_CALLS = 3          // mínimo de llamadas para entrar al ranking (si no, 0)
+const FULL_CONF = 20         // nº de señales (llamadas + cierres) para fiabilidad plena
 
 // Pesos del rendimiento (suman 1). Cuatro bloques: negocio, eficiencia, habilidad
 // y consistencia. Cambiar aquí re-pondera todo el ranking.
@@ -133,37 +136,25 @@ export function computeApexElo(closers, now = Date.now()) {
     x.form = clamp(sum(Object.keys(ELO_WEIGHTS).map(k => ELO_WEIGHTS[k] * sub[k])))
     x.activity = activityFactor(f.daysSince)
     x.inactive = f.daysSince > INACTIVE_DAYS
-    x.dead = f.daysSince >= DEAD_DAYS || !isFinite(f.daysSince)
-    // Forma efectiva: la inactividad debilita; así los activos ganan los "partidos".
-    x.eff = clamp(x.form * x.activity)
+
+    // ¿Entra al ranking? Hace falta un mínimo de llamadas reales o un cierre.
+    // Sin eso, Elo = 0 (es lo que pasa ahora: nadie tiene llamadas reales).
+    x.ranked = f.callVol >= MIN_CALLS || f.deals >= 1
+    // Fiabilidad por muestra: 1 llamada vale poco; sube con el volumen real.
+    x.confidence = clamp((f.callVol + f.deals) / FULL_CONF)
+    // "Inactivo duro": sin datos o parado >30 días → siempre por debajo y sin sostén.
+    x.dead = !x.ranked || f.daysSince >= DEAD_DAYS || !isFinite(f.daysSince)
+    // Elo = forma × actividad × fiabilidad, anclado en 0 y escalado a puntos.
+    x.eff = clamp(x.form * x.activity * x.confidence)
+    x.elo = x.ranked ? Math.round(x.eff * ELO_SCALE) : 0
   }
 
-  // Round-robin Elo: cada closer "juega" contra todos. El resultado esperado de
-  // i vs j sale de la diferencia de forma efectiva (logística); el rating se
-  // ajusta hacia el resultado real durante varias pasadas hasta converger.
-  const n = feats.length
-  const R = feats.map(() => BASE)
-  if (n > 1) {
-    const score = (a, b) => 1 / (1 + Math.exp(-(a - b) * SCALE))         // forma → prob. de ganar
-    for (let p = 0; p < PASSES; p++) {
-      const delta = new Array(n).fill(0)
-      for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-          const exp_i = 1 / (1 + Math.pow(10, (R[j] - R[i]) / 400))      // esperado por Elo
-          const act_i = score(feats[i].eff, feats[j].eff)               // real por forma
-          const d = K * (act_i - exp_i)
-          delta[i] += d
-          delta[j] -= d
-        }
-      }
-      for (let i = 0; i < n; i++) R[i] += delta[i] / (n - 1)
-    }
-  }
-
-  const ratings = feats.map((x, i) => ({
+  const ratings = feats.map((x) => ({
     userId: x.userId,
-    elo: Math.round(R[i]),
+    elo: x.elo,
+    ranked: x.ranked,
     form: Math.round(x.form * 1000) / 1000,
+    confidence: Math.round(x.confidence * 100) / 100,
     activity: Math.round(x.activity * 100) / 100,
     inactive: x.inactive,
     dead: x.dead,
@@ -175,8 +166,8 @@ export function computeApexElo(closers, now = Date.now()) {
     closeRate: x.f.closeRate,
   }))
 
-  // Orden: los inactivos "duros" SIEMPRE por debajo de cualquier activo (no se
-  // sostienen en el ranking); dentro de cada grupo, por Elo.
+  // Orden: primero los que están en el ranking (Elo>0), por Elo desc; los que no
+  // han entrado (0) o están inactivos "duros", al final.
   ratings.sort((a, b) => (a.dead === b.dead ? b.elo - a.elo : a.dead ? 1 : -1))
   ratings.forEach((r, i) => { r.rank = i + 1 })
 

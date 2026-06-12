@@ -33,7 +33,7 @@ export default function Ranking() {
         </div>
       } />
       <section className="apex-section">
-        <p className="set-note" style={{ margin: 0 }}>{scope === 'friends' ? 'Tú y tus amigos, por Apex Elo.' : 'Todos los closers, por Apex Elo.'} El Elo combina cierre, show rate, cash, ticket, habilidades del workshop y consistencia. <b>Si dejas de cerrar, tu Elo decae</b> y te adelantan: a los 7 días sin actividad empieza a bajar.</p>
+        <p className="set-note" style={{ margin: 0 }}>{scope === 'friends' ? 'Tú y tus amigos, por Apex Elo.' : 'Todos los closers, por Apex Elo.'} <b>Empieza en 0 y se gana con llamadas reales.</b> Combina cierre, show rate, cash, ticket, habilidades del workshop y consistencia, ponderado por volumen. Si dejas de cerrar, decae y te adelantan (a los 7 días empieza a bajar).</p>
         {state === 'error' && <div className="apex-card" style={{ padding: 16, color: 'var(--apex-plat-mid)' }}>No pude cargar el ranking (¿backend?).</div>}
         {state === 'live' && data.me && (
           <div className="apex-card" style={{ padding: 14, borderColor: 'color-mix(in srgb, #8AC8E0 45%, var(--apex-border))' }}>
@@ -56,7 +56,7 @@ export default function Ranking() {
                 <span style={{ marginTop: 2 }}><AvailabilityDot status={r.status} /></span>
               </span>
               <span className="rk-deals">{r.deals} cierres · {money(r.revenue)}</span>
-              <span className="rk-rev">{r.elo}<span className="rk-elo-u">Elo</span></span>
+              <span className="rk-rev">{r.ranked ? <>{r.elo}<span className="rk-elo-u">Elo</span></> : <span className="rk-elo-u" style={{ fontSize: 12 }}>Sin actividad</span>}</span>
             </button>
           ))}
         </div>
