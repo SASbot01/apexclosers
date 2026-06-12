@@ -9,6 +9,7 @@
 // este endpoint no está disponible (vite dev sin backend).
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
+import { detectProject } from './_lib/projectDetector.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
     if (action === 'list')   return listLeads(req, res)
     if (action === 'upsert') return upsertLead(req, res)
     if (action === 'delete') return deleteLead(req, res)
+    if (action === 'detect-project') return detectLeadProject(req, res)
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[leads]', action, e)
@@ -81,4 +83,23 @@ async function deleteLead(req, res) {
   const { error } = await supabase.from('leads').delete().eq('id', id).eq('owner_id', userId)
   if (error) return res.status(500).json({ error: error.message })
   return res.status(200).json({ ok: true })
+}
+
+// Detecta (IA) a qué proyecto pertenece un lead y lo guarda. Usa el contexto del
+// lead (nombre, empresa, fuente, llamada asociada si la hay).
+async function detectLeadProject(req, res) {
+  const { userId, leadId } = req.body || {}
+  if (!userId || !leadId) return res.status(400).json({ error: 'userId_and_leadId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).eq('owner_id', userId).maybeSingle()
+  if (!lead) return res.status(404).json({ error: 'not_found' })
+  // Si el lead salió de una llamada, sumamos su título/resumen al contexto.
+  let title = lead.name, summary = [lead.company, lead.source, lead.next_step].filter(Boolean).join(' · ')
+  if (lead.calendar_event_id) {
+    const { data: call } = await supabase.from('calls').select('title, summary').eq('user_id', userId).eq('calendar_event_id', lead.calendar_event_id).maybeSingle()
+    if (call) { title = call.title || title; summary = call.summary || summary }
+  }
+  const det = await detectProject({ closerId: userId, title, summary, attendees: [lead.email].filter(Boolean) })
+  if (det.key) await supabase.from('leads').update({ project: det.key }).eq('id', leadId)
+  return res.status(200).json({ ok: true, project: det.key, project_name: det.name, confidence: det.confidence, method: det.method })
 }

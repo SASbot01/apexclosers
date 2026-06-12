@@ -32,6 +32,9 @@ import {
 } from './_lib/callAnalysis.js'
 import { notify, enqueueFollowUps } from './_lib/workflow.js'
 import { indexCall } from './_lib/coachRag.js'
+import { detectProject } from './_lib/projectDetector.js'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -293,6 +296,22 @@ async function finalize(req, res) {
   // coach pueda recuperarla y CITARLA. Best-effort, no bloquea la respuesta.
   indexCall({ id: row.id, user_id: row.user_id, title: row.title, started_at: row.started_at || row.scheduled_at || row.created_at, transcript, summary, feedback }).catch(() => {})
 
+  // 🧠 PROYECTO de la llamada (IA): si el closer lleva varios clientes, deduce a
+  // cuál pertenece esta llamada (título + asistentes + cuenta + transcripción) y
+  // lo fija en la llamada, la venta y el lead. Si ya venía marcado, se respeta.
+  let projectKey = row.client_id || null
+  try {
+    if (!projectKey) {
+      const det = await detectProject({ closerId: row.user_id, title: row.title, summary, transcript })
+      if (det.key) {
+        projectKey = det.key
+        if (UUID_RE.test(projectKey)) await supabase.from('calls').update({ client_id: projectKey }).eq('id', row.id)
+        if (row.calendar_event_id) await supabase.from('leads').update({ project: projectKey }).eq('owner_id', row.user_id).eq('calendar_event_id', row.calendar_event_id)
+        console.log(`[finalize] proyecto detectado (${det.method}, conf ${det.confidence}): ${det.name}`)
+      }
+    }
+  } catch (e) { console.error('[finalize] project detect failed', e.message) }
+
   // Si en la transcripción se CERRÓ una venta, la registramos en la TABLA DE
   // VENTAS como "pendiente" con TODOS los campos (producto, precio, método y tipo
   // de pago, cobrado…). NO cuenta en métricas hasta subir justificante y
@@ -305,7 +324,7 @@ async function finalize(req, res) {
     try {
       const saleRow = {
         owner_id:       row.user_id,
-        client_id:      row.client_id ?? null,
+        client_id:      projectKey ?? row.client_id ?? null,   // proyecto detectado por IA
         call_id:        row.id,
         date:           row.ended_at || new Date().toISOString(),
         closer:         hostName || null,

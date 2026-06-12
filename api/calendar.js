@@ -13,6 +13,7 @@ import { supabase, supabaseReady } from './_lib/supabase.js'
 import { classifyCall } from './_lib/callClassifier.js'
 import { createBot, recallReady } from './_lib/recall.js'
 import { dueForScheduling, computeJoinAt } from './_lib/schedule.js'
+import { detectProject, getCloserProjects } from './_lib/projectDetector.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -154,16 +155,30 @@ async function sync(req, res) {
   if (!accounts.length) return res.status(200).json({ created: 0, reason: 'google_not_connected' })
 
   const sales = shaped.filter(e => e.classification?.shouldAttachBot) // solo llamadas de venta
+  // Proyectos del closer (1 vez): si tiene clientes, etiquetamos cada lead con el
+  // suyo. Heurístico (título/asistentes/cuenta de Google), sin LLM en el cron.
+  const projects = await getCloserProjects(userId)
   let created = 0
   for (const e of sales) {
-    const { error } = await supabase.from('leads').upsert({
+    let project = null
+    if (projects.length) {
+      const det = await detectProject({
+        closerId: userId, title: e.title,
+        attendees: [e.lead_email].filter(Boolean),
+        accountLabel: e.account_label, accountEmail: e.account_email,
+      }, { useLLM: false, candidates: projects })
+      project = det.key
+    }
+    const row = {
       owner_id: userId,
       calendar_event_id: e.calendar_event_id,
       name: e.lead_name, email: e.lead_email,
       stage: 'agendada', source: 'Google Calendar',
       meeting_url: e.meeting_url, platform: e.platform,
       next_step: 'Llamada agendada', next_at: e.start, last_at: e.start,
-    }, { onConflict: 'owner_id,calendar_event_id' })
+    }
+    if (project) row.project = project   // solo si se detectó (no machaca uno manual)
+    const { error } = await supabase.from('leads').upsert(row, { onConflict: 'owner_id,calendar_event_id' })
     if (!error) created++
   }
   return res.status(200).json({ ok: true, scanned: shaped.length, salesEvents: sales.length, upserted: created })
