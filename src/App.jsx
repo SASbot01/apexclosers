@@ -24,6 +24,7 @@ import CV from './pages/cv/CV'
 import ClientPortal from './pages/client/ClientPortal'
 import Admin from './pages/admin/Admin'
 import Landing from './pages/landing/Landing'
+import BookingPage from './pages/host/BookingPage'
 import { useCurrentUser } from './lib/auth'
 
 /*
@@ -43,6 +44,8 @@ export default function App() {
         {/* Currículum web público (compartible) — fuera del AuthGate. */}
         <Route path="/cv/:userId" element={<CV />} />
         <Route path="/cv" element={<CV />} />
+        {/* Página pública de reserva (enlace de agenda del Host) — sin sesión. */}
+        <Route path="/agenda/:slug" element={<BookingPage />} />
         <Route path="/*" element={<AuthGate><Shell /></AuthGate>} />
       </Routes>
     </ApexThemeProvider>

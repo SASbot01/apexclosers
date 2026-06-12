@@ -5,6 +5,7 @@ import FloatingHeader from '../../components/FloatingHeader'
 import { useCurrentUser, signOut } from '../../lib/auth'
 import { getMetrics, getVisibility, setVisibility as apiSetVisibility } from '../../lib/salesApi'
 import { API_BASE } from '../../lib/config'
+import { listGoogleAccounts, connectGoogleUrl, updateGoogleAccount, removeGoogleAccount } from '../../lib/googleApi'
 
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const intf = (v) => new Intl.NumberFormat('es-ES').format(Math.round(v || 0))
@@ -197,8 +198,69 @@ function IntegrationsTab() {
           )
         })}
       </div>
-      <p className="set-note">Google Calendar se conecta solo al iniciar sesión con Google. CRM y API/Webhooks se activan próximamente.</p>
+      <GoogleAccounts />
+      <p className="set-note">CRM y API/Webhooks se activan próximamente.</p>
     </>
+  )
+}
+
+// Gestión de VARIAS cuentas de Google: la del login (principal) + las de los
+// clientes del closer (cada una aporta sus calendarios al calendario unificado).
+function GoogleAccounts() {
+  const [accounts, setAccounts] = useState(null)
+  const [editing, setEditing] = useState(null)   // id en edición de alias
+  const [draft, setDraft] = useState('')
+  const load = () => listGoogleAccounts().then(setAccounts).catch(() => setAccounts([]))
+  useEffect(() => { load() }, [])
+
+  const toggle = async (a) => { await updateGoogleAccount(a.id, { active: !a.active }).catch(() => {}); load() }
+  const saveLabel = async (a) => { await updateGoogleAccount(a.id, { label: draft }).catch(() => {}); setEditing(null); load() }
+  const remove = async (a) => { if (!confirm(`¿Desconectar ${a.email}?`)) return; await removeGoogleAccount(a.id).catch(() => {}); load() }
+
+  return (
+    <div className="apex-card" style={{ padding: 18, marginTop: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <h4 style={{ margin: 0, fontWeight: 500 }}>Cuentas de Google conectadas</h4>
+        <a className="set-btn" href={connectGoogleUrl()}>+ Conectar otra cuenta</a>
+      </div>
+      <p className="set-note" style={{ margin: '0 0 12px' }}>Conecta los Gmail de tus clientes para ver todos sus calendarios en un solo sitio. El Notetaker entra a las llamadas de venta de cualquiera de ellos.</p>
+      {accounts === null && <p className="set-note">Cargando…</p>}
+      {accounts && accounts.length === 0 && <p className="set-note">Aún no hay cuentas. Inicia sesión con Google o conecta una.</p>}
+      <div className="ga-list">
+        {(accounts || []).map(a => (
+          <div className="ga-row" key={a.id}>
+            <span className="ga-dot" data-on={a.active || undefined} />
+            <span className="ga-id">
+              {editing === a.id
+                ? <input className="ga-input" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveLabel(a)} placeholder="Alias (p. ej. Cliente Hugo)" autoFocus />
+                : <><b>{a.label || a.email}</b>{a.label && <small>{a.email}</small>}</>}
+            </span>
+            {a.is_primary && <span className="ga-tag">principal</span>}
+            <span className="ga-actions">
+              {editing === a.id
+                ? <button className="ga-link" onClick={() => saveLabel(a)}>Guardar</button>
+                : <button className="ga-link" onClick={() => { setEditing(a.id); setDraft(a.label || '') }}>Renombrar</button>}
+              <button className="ga-link" onClick={() => toggle(a)}>{a.active ? 'Desactivar' : 'Activar'}</button>
+              {!a.is_primary && <button className="ga-link ga-del" onClick={() => remove(a)}>Quitar</button>}
+            </span>
+          </div>
+        ))}
+      </div>
+      <style>{`
+        .ga-list { display: flex; flex-direction: column; }
+        .ga-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--apex-border); font-size: 13.5px; }
+        .ga-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--apex-plat-low); flex-shrink: 0; }
+        .ga-dot[data-on] { background: #5fce8f; }
+        .ga-id { display: flex; flex-direction: column; flex: 1; min-width: 0; color: var(--apex-plat-hi); }
+        .ga-id small { color: var(--apex-plat-low); font-size: 11.5px; }
+        .ga-input { background: var(--apex-trigger-bg); border: 1px solid var(--apex-border); border-radius: 8px; padding: 6px 9px; color: var(--apex-plat-hi); font-size: 13px; }
+        .ga-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--apex-plat-mid); border: 1px solid var(--apex-border); border-radius: 6px; padding: 1px 6px; }
+        .ga-actions { display: inline-flex; gap: 12px; }
+        .ga-link { background: none; border: none; color: var(--apex-plat-mid); cursor: pointer; font-size: 12.5px; padding: 0; }
+        .ga-link:hover { color: var(--apex-plat-hi); }
+        .ga-del:hover { color: #ff8a8a; }
+      `}</style>
+    </div>
   )
 }
 

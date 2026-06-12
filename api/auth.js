@@ -55,6 +55,9 @@ export default async function handler(req, res) {
       case 'google-callback': return googleCallback(req, res)
       case 'me':              return me(req, res)
       case 'integrations':    return integrations(req, res)
+      case 'google-accounts':       return googleAccounts(req, res)
+      case 'google-account-update': return googleAccountUpdate(req, res)
+      case 'google-account-remove': return googleAccountRemove(req, res)
       case 'client-login':    return passwordLogin(req, res)
       case 'password-login':  return passwordLogin(req, res)
       case 'admin-login':     return passwordLogin(req, res)
@@ -71,14 +74,20 @@ export default async function handler(req, res) {
 
 function googleStart(req, res) {
   if (!process.env.GOOGLE_CLIENT_ID) return res.status(500).json({ error: 'google_not_configured' })
+  // Modo "conectar otra cuenta": el usuario YA tiene sesión y quiere añadir un
+  // calendario más (un cliente con otro Gmail). state=connect:<sessionToken>;
+  // forzamos select_account para que pueda elegir una cuenta distinta a la suya.
+  const connectToken = req.query.connect ? String(req.query.connect).slice(0, 64) : null
+  const state = connectToken ? `connect:${connectToken}`
+    : (req.query.ref ? String(req.query.ref).slice(0, 64) : null)   // afiliado que lo trajo
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri(req),
     response_type: 'code',
     scope: 'openid email profile https://www.googleapis.com/auth/calendar',
     access_type: 'offline',
-    prompt: 'consent',
-    ...(req.query.ref ? { state: String(req.query.ref).slice(0, 64) } : {}),   // afiliado que lo trajo
+    prompt: connectToken ? 'consent select_account' : 'consent',
+    ...(state ? { state } : {}),
   })
   res.writeHead(302, { Location: `https://accounts.google.com/o/oauth2/v2/auth?${params}` })
   res.end()
@@ -107,6 +116,21 @@ async function googleCallback(req, res) {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   })
   if (!ui.email) return res.status(401).json({ error: 'userinfo_failed' })
+
+  // 2b) MODO CONECTAR OTRA CUENTA: el usuario ya tiene sesión y añade un Gmail
+  // más (cliente con otro calendario). No se crea sesión ni se toca `users`:
+  // solo guardamos la cuenta Google ligada a su user_id.
+  const stateRaw = req.query.state || ''
+  if (String(stateRaw).startsWith('connect:')) {
+    const sessTok = String(stateRaw).slice('connect:'.length)
+    const { data: sess } = await supabase.from('sessions').select('user_id, expires_at').eq('token', sessTok).maybeSingle()
+    if (!sess || (sess.expires_at && new Date(sess.expires_at) < new Date())) {
+      res.writeHead(302, { Location: `${baseUrl(req)}/ajustes?gconnect=expired` }); return res.end()
+    }
+    await upsertGoogleAccount(sess.user_id, ui, tokens, false)
+    res.writeHead(302, { Location: `${baseUrl(req)}/ajustes?gconnect=ok&email=${encodeURIComponent(ui.email)}` })
+    return res.end()
+  }
 
   // 3) upsert user (¿es nuevo? para el tracking de afiliados)
   const { data: existingUser } = await supabase.from('users').select('id').eq('email', ui.email).maybeSingle()
@@ -138,18 +162,36 @@ async function googleCallback(req, res) {
     expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
   })
 
-  // 4b) guardar tokens de Google (para leer calendario + compartidos, crear leads)
-  await supabase.from('google_tokens').upsert({
-    user_id: user.id,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token || undefined,
-    expiry: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id' })
+  // 4b) guardar tokens de Google (para leer calendario + compartidos, crear leads).
+  // Fuente de verdad = google_accounts (varias por usuario). Esta es la PRIMARIA.
+  await upsertGoogleAccount(user.id, ui, tokens, true)
 
   // 5) volver a la app con el token
   res.writeHead(302, { Location: `${baseUrl(req)}/?session=${token}` })
   res.end()
+}
+
+// Guarda/actualiza una cuenta Google ligada a un usuario. `primary` = la del
+// login. Solo machaca el refresh_token si Google nos da uno nuevo (en logins
+// repetidos a veces no lo reenvía). Para cuentas conectadas, el label por defecto
+// es el propio email.
+async function upsertGoogleAccount(userId, ui, tokens, primary) {
+  const base = {
+    user_id: userId,
+    email: ui.email,
+    google_sub: ui.sub || null,
+    access_token: tokens.access_token,
+    expiry: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+    is_primary: primary,
+    updated_at: new Date().toISOString(),
+  }
+  if (tokens.refresh_token) base.refresh_token = tokens.refresh_token
+  const { data: existing } = await supabase.from('google_accounts').select('id, label').eq('user_id', userId).eq('email', ui.email).maybeSingle()
+  if (existing) {
+    await supabase.from('google_accounts').update(base).eq('id', existing.id)
+  } else {
+    await supabase.from('google_accounts').insert({ ...base, label: primary ? null : ui.email })
+  }
 }
 
 function getToken(req) {
@@ -213,12 +255,50 @@ async function createAccount(req, res) {
 // (es decir, hizo login con Google, que ya incluye el scope de Calendar).
 async function integrations(req, res) {
   const userId = req.query.userId
-  let google = false
+  let google = false, googleAccountsCount = 0
   if (userId && supabaseReady()) {
-    const { data } = await supabase.from('google_tokens').select('user_id').eq('user_id', userId).maybeSingle()
-    google = !!data
+    const { data } = await supabase.from('google_accounts').select('id').eq('user_id', userId)
+    googleAccountsCount = (data || []).length
+    google = googleAccountsCount > 0
   }
-  return res.status(200).json({ google, recall: !!process.env.RECALL_API_KEY })
+  return res.status(200).json({ google, googleAccountsCount, recall: !!process.env.RECALL_API_KEY })
+}
+
+// Lista las cuentas de Google conectadas del usuario (sin exponer tokens).
+async function googleAccounts(req, res) {
+  const userId = req.query.userId
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { data } = await supabase.from('google_accounts')
+    .select('id, email, label, is_primary, active, created_at')
+    .eq('user_id', userId).order('is_primary', { ascending: false }).order('created_at')
+  return res.status(200).json({ accounts: data || [] })
+}
+
+// Renombra (label) o activa/desactiva una cuenta conectada.
+async function googleAccountUpdate(req, res) {
+  const { userId, id, label, active } = req.body || {}
+  if (!userId || !id) return res.status(400).json({ error: 'userId_and_id_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const patch = { updated_at: new Date().toISOString() }
+  if (label !== undefined) patch.label = String(label).slice(0, 80) || null
+  if (active !== undefined) patch.active = !!active
+  const { error } = await supabase.from('google_accounts').update(patch).eq('id', id).eq('user_id', userId)
+  if (error) return res.status(500).json({ error: error.message })
+  return res.status(200).json({ ok: true })
+}
+
+// Desconecta una cuenta. La primaria (la del login) no se puede quitar aquí.
+async function googleAccountRemove(req, res) {
+  const userId = req.query.userId || req.body?.userId
+  const id = req.query.id || req.body?.id
+  if (!userId || !id) return res.status(400).json({ error: 'userId_and_id_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+  const { data: acc } = await supabase.from('google_accounts').select('is_primary').eq('id', id).eq('user_id', userId).maybeSingle()
+  if (!acc) return res.status(404).json({ error: 'not_found' })
+  if (acc.is_primary) return res.status(400).json({ error: 'cannot_remove_primary' })
+  await supabase.from('google_accounts').delete().eq('id', id).eq('user_id', userId)
+  return res.status(200).json({ ok: true })
 }
 
 async function logout(req, res) {

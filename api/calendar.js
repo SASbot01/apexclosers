@@ -29,30 +29,56 @@ export default async function handler(req, res) {
   }
 }
 
-// Token de Google del usuario, refrescándolo si caducó.
-async function getAccessToken(userId) {
-  const { data: row } = await supabase.from('google_tokens').select('*').eq('user_id', userId).maybeSingle()
-  if (!row) return null
-  if (row.expiry && new Date(row.expiry) > new Date(Date.now() + 60000)) return row.access_token
-  if (!row.refresh_token) return row.access_token
+// Cuentas de Google ACTIVAS del usuario (varias: la del login + las de sus
+// clientes). El calendario unificado junta los eventos de todas.
+async function getActiveAccounts(userId) {
+  const { data } = await supabase.from('google_accounts').select('*').eq('user_id', userId).eq('active', true)
+  return data || []
+}
+
+// Token fresco de UNA cuenta, refrescándolo si caducó (y persistiéndolo).
+export async function freshToken(acc) {
+  if (acc.expiry && new Date(acc.expiry) > new Date(Date.now() + 60000)) return acc.access_token
+  if (!acc.refresh_token) return acc.access_token
   const r = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: row.refresh_token,
+      refresh_token: acc.refresh_token,
       grant_type: 'refresh_token',
     }),
   })
   const d = await r.json()
-  if (!d.access_token) return row.access_token
-  await supabase.from('google_tokens').update({
+  if (!d.access_token) return acc.access_token
+  await supabase.from('google_accounts').update({
     access_token: d.access_token,
     expiry: new Date(Date.now() + (d.expires_in || 3600) * 1000).toISOString(),
     updated_at: new Date().toISOString(),
-  }).eq('user_id', userId)
+  }).eq('id', acc.id)
   return d.access_token
+}
+
+// La cuenta primaria (la del login). Sirve de fallback para crear eventos.
+async function getPrimaryAccount(userId) {
+  const { data } = await supabase.from('google_accounts').select('*').eq('user_id', userId)
+    .order('is_primary', { ascending: false }).order('created_at').limit(1).maybeSingle()
+  return data || null
+}
+
+// Junta los eventos (ya con forma) de TODAS las cuentas activas del usuario.
+async function fetchEventsAllAccounts(userId) {
+  const accounts = await getActiveAccounts(userId)
+  const out = []
+  for (const acc of accounts) {
+    const token = await freshToken(acc)
+    try {
+      const evs = await fetchEvents(token)
+      for (const e of evs) out.push(shapeEvent(e, acc.email, acc))
+    } catch (err) { console.error('[calendar] account fetch failed', acc.email, err.message) }
+  }
+  return { accounts, events: out }
 }
 
 function meetingUrlFor(ev) {
@@ -81,7 +107,7 @@ async function fetchEvents(token) {
   return out
 }
 
-function shapeEvent({ ev, calendar }, ownerEmail) {
+function shapeEvent({ ev, calendar }, ownerEmail, account = null) {
   const conf = meetingUrlFor(ev)
   const cls = classifyCall({
     title: ev.summary, description: ev.description,
@@ -96,6 +122,10 @@ function shapeEvent({ ev, calendar }, ownerEmail) {
     end: ev.end?.dateTime || ev.end?.date || null,
     all_day: !ev.start?.dateTime,
     calendar,
+    // de qué cuenta Google viene (para distinguir clientes en el calendario unificado)
+    account_id: account?.id || null,
+    account_email: account?.email || ownerEmail || null,
+    account_label: account?.label || account?.email || null,
     classification: cls,
     meeting_url: conf.url, platform: conf.platform,
     lead_name: lead?.displayName || lead?.email || ev.summary || 'Lead',
@@ -106,11 +136,13 @@ function shapeEvent({ ev, calendar }, ownerEmail) {
 async function listEvents(req, res) {
   const userId = req.query.userId
   if (!userId) return res.status(400).json({ error: 'userId_required' })
-  const token = await getAccessToken(userId)
-  if (!token) return res.status(200).json({ events: [], reason: 'google_not_connected' })
-  const { data: u } = await supabase.from('users').select('email').eq('id', userId).maybeSingle()
-  const events = (await fetchEvents(token)).map(e => shapeEvent(e, u?.email)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-  return res.status(200).json({ events })
+  const { accounts, events } = await fetchEventsAllAccounts(userId)
+  if (!accounts.length) return res.status(200).json({ events: [], reason: 'google_not_connected' })
+  events.sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+  return res.status(200).json({
+    events,
+    accounts: accounts.map(a => ({ id: a.id, email: a.email, label: a.label || a.email, is_primary: a.is_primary })),
+  })
 }
 
 // Crea/actualiza leads desde las llamadas de venta agendadas (dedupe por calendar_event_id).
@@ -118,11 +150,9 @@ async function sync(req, res) {
   const userId = req.query.userId
   if (!userId) return res.status(400).json({ error: 'userId_required' })
   if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
-  const token = await getAccessToken(userId)
-  if (!token) return res.status(200).json({ created: 0, reason: 'google_not_connected' })
-  const { data: u } = await supabase.from('users').select('email').eq('id', userId).maybeSingle()
+  const { accounts, events: shaped } = await fetchEventsAllAccounts(userId)
+  if (!accounts.length) return res.status(200).json({ created: 0, reason: 'google_not_connected' })
 
-  const shaped = (await fetchEvents(token)).map(e => shapeEvent(e, u?.email))
   const sales = shaped.filter(e => e.classification?.shouldAttachBot) // solo llamadas de venta
   let created = 0
   for (const e of sales) {
@@ -154,12 +184,10 @@ async function sync(req, res) {
 const newShareToken = () => crypto.randomBytes(16).toString('hex')
 
 async function scheduleBotsForUser(userId) {
-  const token = await getAccessToken(userId)
-  if (!token) return { userId, scheduled: 0, reason: 'google_not_connected' }
-  const { data: u } = await supabase.from('users').select('email').eq('id', userId).maybeSingle()
+  const { accounts, events: shaped } = await fetchEventsAllAccounts(userId)
+  if (!accounts.length) return { userId, scheduled: 0, reason: 'google_not_connected' }
 
   const now = Date.now()
-  const shaped = (await fetchEvents(token)).map(e => shapeEvent(e, u?.email))
   const due = shaped.filter(e => dueForScheduling(e, now))
 
   let scheduled = 0
@@ -214,23 +242,28 @@ async function scheduleBots(req, res) {
     return res.status(200).json({ ok: true, ...(await scheduleBotsForUser(userId)) })
   }
 
-  // Modo cron: todos los closers con Google conectado.
-  const { data: tokens } = await supabase.from('google_tokens').select('user_id')
+  // Modo cron: todos los closers con alguna cuenta de Google conectada.
+  const { data: accs } = await supabase.from('google_accounts').select('user_id')
+  const userIds = [...new Set((accs || []).map(a => a.user_id))]
   const results = []
-  for (const t of (tokens || [])) {
-    try { results.push(await scheduleBotsForUser(t.user_id)) }
-    catch (e) { results.push({ userId: t.user_id, error: e.message }) }
+  for (const uid of userIds) {
+    try { results.push(await scheduleBotsForUser(uid)) }
+    catch (e) { results.push({ userId: uid, error: e.message }) }
   }
   const scheduled = results.reduce((n, r) => n + (r.scheduled || 0), 0)
   return res.status(200).json({ ok: true, closers: results.length, scheduled, results })
 }
 
 // Crea un evento en el calendario del usuario (bidireccional) con Meet, hora España.
+// accountId opcional: en qué cuenta Google crearlo (default = la primaria).
 async function createEvent(req, res) {
-  const { userId, summary, startISO, endISO, attendeeEmail, description } = req.body || {}
+  const { userId, summary, startISO, endISO, attendeeEmail, description, accountId } = req.body || {}
   if (!userId || !startISO) return res.status(400).json({ error: 'userId_and_start_required' })
-  const token = await getAccessToken(userId)
-  if (!token) return res.status(200).json({ error: 'google_not_connected' })
+  let acc = null
+  if (accountId) { const { data } = await supabase.from('google_accounts').select('*').eq('id', accountId).eq('user_id', userId).maybeSingle(); acc = data }
+  if (!acc) acc = await getPrimaryAccount(userId)
+  if (!acc) return res.status(200).json({ error: 'google_not_connected' })
+  const token = await freshToken(acc)
   const body = {
     summary: summary || 'Llamada',
     description: description || '',

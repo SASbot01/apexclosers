@@ -3,6 +3,7 @@ import FloatingHeader from '../../components/FloatingHeader'
 import SegTabs from '../../components/SegTabs'
 import { useCurrentUser } from '../../lib/auth'
 import { API_BASE, getUserId } from '../../lib/config'
+import HostEditor from '../host/HostEditor'
 
 /*
  * Calendario (booking calendar) — la agenda real de la persona conectada con
@@ -64,6 +65,7 @@ export default function Calendar() {
   const [events, setEvents] = useState([])
   const [state, setState] = useState('loading') // loading | live | not_connected | error
   const [selected, setSelected] = useState(null)
+  const [hostOpen, setHostOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -148,9 +150,12 @@ export default function Calendar() {
       <FloatingHeader title="Calendario" eyebrow="LLAMADAS" actions={
         <>
           <SegTabs tabs={CALLS_TABS} />
+          <button type="button" className="ac-btn" onClick={() => setHostOpen(true)} title="Edita tu enlace de agenda">🗓️ Host</button>
           <span className="ac-source">{user.email || 'tu Google'} · hora España</span>
         </>
       } />
+
+      {hostOpen && <HostEditor onClose={() => setHostOpen(false)} />}
 
       <section className="apex-section">
         <div className="apex-card kpi-strip">

@@ -9,6 +9,7 @@ import { signOut } from '../../lib/auth'
 import { getUserId } from '../../lib/config'
 import TeamChat from '../../components/TeamChat'
 import { FriendsPanel, GroupsPanel } from '../profile/Profile'
+import CompanyCrm from './CompanyCrm'
 
 /*
  * Portal del CLIENTE (empresa). Su perfil = la empresa (descripción/redes/web).
@@ -39,13 +40,14 @@ export default function ClientPortal() {
 
       <section className="apex-section">
         <div className="seg" style={{ width: 'fit-content' }}>
-          {[['equipo', 'Mi equipo'], ['amigos', 'Amigos'], ['grupos', 'Grupos'], ['empresa', 'Perfil de empresa']].map(([k, l]) => (
+          {[['equipo', 'Mi equipo'], ['crm', 'CRM'], ['amigos', 'Amigos'], ['grupos', 'Grupos'], ['empresa', 'Perfil de empresa']].map(([k, l]) => (
             <button key={k} className="seg-btn" data-active={tab === k || undefined} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
       </section>
 
       {tab === 'equipo' && <ClientTeams onOpenMember={(id) => navigate(`/perfil/${id}?client=${getUserId()}`)} />}
+      {tab === 'crm' && <CompanyCrm />}
       {tab === 'amigos' && <FriendsPanel onOpen={(id) => navigate(`/perfil/${id}`)} />}
       {tab === 'grupos' && <GroupsPanel />}
       {tab === 'empresa' && <CompanyProfile profile={profile} onSaved={loadProfile} />}

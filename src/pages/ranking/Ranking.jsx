@@ -5,8 +5,9 @@ import AvailabilityDot from '../../components/AvailabilityDot'
 import { getRanking } from '../../lib/workflowApi'
 
 /*
- * Ranking Global — clasificación de closers por ventas VERIFICADAS (revenue).
- * Cada closer se muestra con su perfil público; clicas para verlo.
+ * Ranking Global — clasificación de closers por APEX ELO: un rating compuesto de
+ * TODAS sus métricas (resultado, eficiencia, habilidad y consistencia) con
+ * decaimiento por inactividad. Cada closer se muestra con su perfil público.
  */
 const money = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0)
 const initials = (name) => (name || '?').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase()
@@ -32,25 +33,30 @@ export default function Ranking() {
         </div>
       } />
       <section className="apex-section">
-        <p className="set-note" style={{ margin: 0 }}>{scope === 'friends' ? 'Tú y tus amigos, por revenue verificado.' : 'Todos los closers, por revenue de ventas verificadas.'} Sube ventas y verifícalas para escalar.</p>
+        <p className="set-note" style={{ margin: 0 }}>{scope === 'friends' ? 'Tú y tus amigos, por Apex Elo.' : 'Todos los closers, por Apex Elo.'} El Elo combina cierre, show rate, cash, ticket, habilidades del workshop y consistencia. <b>Si dejas de cerrar, tu Elo decae</b> y te adelantan: a los 7 días sin actividad empieza a bajar.</p>
         {state === 'error' && <div className="apex-card" style={{ padding: 16, color: 'var(--apex-plat-mid)' }}>No pude cargar el ranking (¿backend?).</div>}
         {state === 'live' && data.me && (
           <div className="apex-card" style={{ padding: 14, borderColor: 'color-mix(in srgb, #8AC8E0 45%, var(--apex-border))' }}>
-            Tu posición: <b>#{data.me.rank}</b> · {money(data.me.revenue)} · {data.me.deals} cierres
+            Tu posición: <b>#{data.me.rank}</b> · <b>{data.me.elo} Elo</b> · {money(data.me.revenue)} · {data.me.deals} cierres
+            {data.me.inactive && <span className="rk-tag" style={{ marginLeft: 8 }}>Inactivo · tu Elo está decayendo</span>}
           </div>
         )}
       </section>
 
       <section className="apex-section">
-        {state === 'live' && data.ranking.length === 0 && <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>Aún no hay ventas verificadas en el ranking.</div>}
+        {state === 'live' && data.ranking.length === 0 && <div className="apex-card" style={{ padding: 18, color: 'var(--apex-plat-low)' }}>Aún no hay closers en el ranking.</div>}
         <div className="rk-list">
           {data.ranking.map(r => (
-            <button key={r.user_id} type="button" className="apex-card rk-row" data-top={r.rank <= 3 || undefined} onClick={() => navigate(`/perfil/${r.user_id}`)}>
+            <button key={r.user_id} type="button" className="apex-card rk-row" data-top={r.rank <= 3 || undefined} data-dim={r.dead || undefined} onClick={() => navigate(`/perfil/${r.user_id}`)}>
               <span className="rk-pos">{medal(r.rank)}</span>
               <span className="rk-av">{r.photo_url ? <img src={r.photo_url} alt="" /> : <span>{initials(r.name)}</span>}</span>
-              <span className="rk-id"><span className="rk-name">{r.name}</span>{r.nickname && <span className="rk-nick">@{r.nickname}</span>}<span style={{ marginTop: 2 }}><AvailabilityDot status={r.status} /></span></span>
-              <span className="rk-deals">{r.deals} cierres</span>
-              <span className="rk-rev">{money(r.revenue)}</span>
+              <span className="rk-id">
+                <span className="rk-name">{r.name}{r.inactive && <span className="rk-tag">{r.dead ? 'inactivo' : 'decae'}</span>}</span>
+                {r.nickname && <span className="rk-nick">@{r.nickname}</span>}
+                <span style={{ marginTop: 2 }}><AvailabilityDot status={r.status} /></span>
+              </span>
+              <span className="rk-deals">{r.deals} cierres · {money(r.revenue)}</span>
+              <span className="rk-rev">{r.elo}<span className="rk-elo-u">Elo</span></span>
             </button>
           ))}
         </div>
@@ -68,7 +74,10 @@ export default function Ranking() {
         .rk-name { font-size: 13.5px; color: var(--apex-plat-hi); }
         .rk-nick { font-size: 11px; color: var(--apex-plat-low); }
         .rk-deals { font-size: 12px; color: var(--apex-plat-low); }
-        .rk-rev { font-size: 14px; color: var(--apex-plat-hi); font-family: var(--apex-font); }
+        .rk-rev { font-size: 19px; color: var(--apex-plat-hi); font-family: var(--apex-font); font-variant-numeric: tabular-nums; display: inline-flex; align-items: baseline; gap: 4px; }
+        .rk-elo-u { font-size: 10px; color: var(--apex-plat-low); letter-spacing: .04em; }
+        .rk-tag { font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; color: #d9a441; border: 1px solid color-mix(in srgb, #d9a441 45%, var(--apex-border)); border-radius: 6px; padding: 1px 5px; margin-left: 7px; vertical-align: middle; }
+        .rk-row[data-dim] { opacity: .58; }
         @media (max-width: 430px) {
           .rk-row { grid-template-columns: 30px 34px 1fr auto; gap: 8px; padding: 11px 12px; }
           .rk-deals { display: none; }

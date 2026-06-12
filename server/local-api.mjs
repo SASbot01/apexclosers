@@ -20,6 +20,7 @@ const PORT = Number(process.env.LOCAL_API_PORT || 5181)
 const ROUTES = {
   '/api/auth':     (await import('../api/auth.js')).default,
   '/api/calendar': (await import('../api/calendar.js')).default,
+  '/api/host':     (await import('../api/host.js')).default,
   '/api/recall':   (await import('../api/recall.js')).default,
   '/api/whatsapp': (await import('../api/whatsapp.js')).default,
   '/api/orbe':     (await import('../api/orbe.js')).default,

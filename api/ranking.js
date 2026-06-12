@@ -1,10 +1,14 @@
-// /api/ranking — Ranking Global de closers por ventas VERIFICADAS. Solo entra
-// en el ranking quien tenga ventas verificadas; se muestra con su perfil público.
+// /api/ranking — Ranking Global de closers por APEX ELO (no por cash collected).
+// El Elo combina TODAS las métricas reales (resultado, eficiencia, habilidad del
+// workshop, consistencia) con decaimiento por inactividad: a un closer inactivo
+// le adelantan los activos y, si lleva >30 días parado, no se sostiene arriba.
+// Ver api/_lib/elo.js para el algoritmo.
 //
 // Acciones (?action=):
-//   GET global  [&userId=]  → { ranking:[{rank,user_id,name,nickname,photo_url,revenue,deals}], me }
+//   GET global  [&userId=] [&scope=friends] → { ranking:[{rank,user_id,name,nickname,photo_url,elo,...}], me }
 
 import { supabase, supabaseReady } from './_lib/supabase.js'
+import { computeApexElo } from './_lib/elo.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -14,6 +18,17 @@ export default async function handler(req, res) {
     console.error('[ranking]', e)
     return res.status(500).json({ error: e.message || 'internal_error' })
   }
+}
+
+// Reparte filas por una clave en un Map de arrays.
+function groupBy(rows, key) {
+  const m = new Map()
+  for (const r of rows || []) {
+    const k = r[key]
+    if (!m.has(k)) m.set(k, [])
+    m.get(k).push(r)
+  }
+  return m
 }
 
 async function globalRanking(req, res) {
@@ -30,45 +45,67 @@ async function globalRanking(req, res) {
     allow = new Set([userId, ...(fr || []).map(f => f.requester_id === userId ? f.addressee_id : f.requester_id)])
   }
 
-  // TODOS los closers entran en el ranking (aunque tengan 0), no solo los que
-  // ya tienen ventas verificadas. Partimos de la lista de usuarios reales.
   const DEMO_SEED = '00000000-0000-0000-0000-000000000001'
-  const [{ data: allUsers }, { data: profs }, { data: sales }] = await Promise.all([
+  const [{ data: allUsers }, { data: profs }] = await Promise.all([
     supabase.from('users').select('id, name, email, picture, account_type').limit(5000),
     supabase.from('profiles').select('user_id, nickname, display_name, photo_url, status').limit(5000),
-    supabase.from('sales').select('owner_id, revenue, cash_collected').eq('status', 'verified').limit(20000),
   ])
   const profById = new Map((profs || []).map(p => [p.user_id, p]))
 
-  // Candidatos: usuarios reales (sin la cuenta demo); en ámbito amigos, solo los permitidos.
+  // Candidatos: closers reales (sin la cuenta demo ni cuentas de cliente).
   const candidates = (allUsers || [])
     .filter(u => u.id !== DEMO_SEED)
-    .filter(u => u.account_type !== 'client')   // el ranking es de CLOSERS, no de cuentas de cliente
+    .filter(u => u.account_type !== 'client')
     .filter(u => !allow || allow.has(u.id))
+  const ids = candidates.map(u => u.id)
+  if (!ids.length) return res.status(200).json({ ranking: [], me: null })
 
-  // Agregado de ventas verificadas por closer (0 si no tiene).
-  const agg = new Map()
-  for (const s of (sales || [])) {
-    const a = agg.get(s.owner_id) || { revenue: 0, cash: 0, deals: 0 }
-    a.revenue += Number(s.revenue) || 0
-    a.cash += Number(s.cash_collected) || 0
-    a.deals += 1
-    agg.set(s.owner_id, a)
-  }
+  // Datos para el Elo: ventas verificadas (revenue/cash, todo el histórico),
+  // llamadas y leads de los últimos 120 días (ventana de "forma" reciente).
+  const since = new Date(Date.now() - 120 * 86400 * 1000).toISOString()
+  const [salesRes, callsRes, leadsRes] = await Promise.all([
+    supabase.from('sales').select('owner_id, revenue, cash_collected, date').eq('status', 'verified').in('owner_id', ids).limit(50000),
+    supabase.from('calls').select('user_id, status, outcome, state, offer_made, deal_closed, skills, objections, started_at')
+      .in('user_id', ids).or(`started_at.gte.${since},started_at.is.null`).limit(50000),
+    supabase.from('leads').select('owner_id, stage, last_at').in('owner_id', ids).limit(50000),
+  ])
+  const salesBy = groupBy(salesRes.data, 'owner_id')
+  const callsBy = groupBy(callsRes.data, 'user_id')
+  const leadsBy = groupBy(leadsRes.data, 'owner_id')
 
-  const rows = candidates.map(u => {
-    const a = agg.get(u.id) || { revenue: 0, cash: 0, deals: 0 }
-    const p = profById.get(u.id)
+  const closers = candidates.map(u => ({
+    userId: u.id,
+    sales: salesBy.get(u.id) || [],
+    calls: callsBy.get(u.id) || [],
+    leads: leadsBy.get(u.id) || [],
+  }))
+
+  const { ratings } = computeApexElo(closers)
+
+  const ranking = ratings.map(r => {
+    const u = candidates.find(c => c.id === r.userId)
+    const p = profById.get(r.userId)
     return {
-      owner_id: u.id, revenue: a.revenue, cash: a.cash, deals: a.deals,
+      rank: r.rank,
+      user_id: r.userId,
+      elo: r.elo,
+      form: r.form,
+      activity: r.activity,
+      inactive: r.inactive,
+      dead: r.dead,
+      days_since: r.daysSince,
+      breakdown: r.breakdown,
+      revenue: r.revenue,
+      cash: r.cash,
+      deals: r.deals,
+      close_rate: r.closeRate,
       nickname: p?.nickname || null,
-      name: p?.display_name || u.name || u.email?.split('@')[0] || 'Closer',
-      photo_url: p?.photo_url || u.picture || null,
+      name: p?.display_name || u?.name || u?.email?.split('@')[0] || 'Closer',
+      photo_url: p?.photo_url || u?.picture || null,
       status: p?.status || 'available',
     }
-  }).sort((a, b) => b.revenue - a.revenue || b.deals - a.deals || a.name.localeCompare(b.name))
+  })
 
-  const ranking = rows.map((r, i) => ({ rank: i + 1, user_id: r.owner_id, revenue: r.revenue, cash: r.cash, deals: r.deals, nickname: r.nickname, name: r.name, photo_url: r.photo_url, status: r.status }))
-  const me = req.query.userId ? ranking.find(r => r.user_id === req.query.userId) || null : null
+  const me = userId ? ranking.find(r => r.user_id === userId) || null : null
   return res.status(200).json({ ranking: ranking.slice(0, 100), me })
 }

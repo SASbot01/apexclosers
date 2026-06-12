@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     if (action === 'my-teams')     return myTeams(req, res)       // equipos donde está el closer
     if (action === 'team-chat')      return teamChatList(req, res)
     if (action === 'team-chat-send') return teamChatSend(req, res)
+    if (action === 'company-crm')    return companyCrm(req, res)     // CRM de empresa
     return res.status(400).json({ error: `unknown_action: ${action}` })
   } catch (e) {
     console.error('[friends]', action, e)
@@ -367,4 +368,68 @@ async function teamRemove(req, res) {
   if (!(await ownsTeam(userId, teamId))) return res.status(403).json({ error: 'not_your_team' })
   await supabase.from('team_members').delete().eq('team_id', teamId).eq('user_id', memberId)
   return res.status(200).json({ ok: true })
+}
+
+// ── CRM de EMPRESA ───────────────────────────────────────────────────────────
+// Devuelve TODOS los leads de los closers que la empresa tiene en sus equipos
+// (membresía aceptada), etiquetados por closer y por proyecto (= teams.client_key),
+// para que la empresa filtre por closer y por proyecto. La empresa solo ve a los
+// closers que aceptaron entrar en alguno de sus equipos.
+async function companyCrm(req, res) {
+  const userId = req.query.userId    // la cuenta de empresa (dueña de los equipos)
+  if (!userId) return res.status(400).json({ error: 'userId_required' })
+  if (!supabaseReady()) return res.status(500).json({ error: 'supabase_not_configured' })
+
+  // 1) Equipos de la empresa → proyecto (client_key) de cada uno.
+  const { data: teams } = await supabase.from('teams').select('id, name, client_key').eq('owner_id', userId)
+  const projects = []   // [{ key, name }]
+  const teamProject = new Map()   // team_id → { key, name }
+  for (const t of (teams || [])) {
+    const proj = { key: t.client_key, name: t.name || t.client_key }
+    teamProject.set(t.id, proj)
+    if (t.client_key && !projects.some(p => p.key === t.client_key)) projects.push(proj)
+  }
+  const teamIds = (teams || []).map(t => t.id)
+  if (!teamIds.length) return res.status(200).json({ leads: [], closers: [], projects: [] })
+
+  // 2) Miembros ACEPTADOS → de qué proyectos (client_keys) es cada closer en ESTA empresa.
+  const { data: mems } = await supabase.from('team_members').select('team_id, user_id, status').in('team_id', teamIds).eq('status', 'accepted')
+  const closerProjects = new Map()   // closerId → Set(client_key)
+  for (const m of (mems || [])) {
+    const proj = teamProject.get(m.team_id)
+    if (!proj) continue
+    if (!closerProjects.has(m.user_id)) closerProjects.set(m.user_id, new Set())
+    if (proj.key) closerProjects.get(m.user_id).add(proj.key)
+  }
+  const closerIds = [...closerProjects.keys()]
+  if (!closerIds.length) return res.status(200).json({ leads: [], closers: [], projects })
+
+  // 3) Leads de esos closers + tarjetas de perfil.
+  const [{ data: leadsRaw }, cards] = await Promise.all([
+    supabase.from('leads').select('*').in('owner_id', closerIds).order('last_at', { ascending: false, nullsFirst: false }).limit(5000),
+    cardsFor(closerIds),
+  ])
+
+  const projName = (key) => projects.find(p => p.key === key)?.name || key
+  const leads = (leadsRaw || []).map(l => {
+    const owned = closerProjects.get(l.owner_id) || new Set()
+    // Proyecto del lead: el suyo si pertenece a esta empresa; si no, el único del
+    // closer en la empresa; si trabaja varios, queda sin asignar.
+    let projectKey = l.project && owned.has(l.project) ? l.project : (owned.size === 1 ? [...owned][0] : null)
+    return {
+      ...l,
+      closer_id: l.owner_id,
+      closer_name: cards[l.owner_id]?.display_name || 'Closer',
+      closer_photo: cards[l.owner_id]?.photo_url || null,
+      project: projectKey,
+      project_name: projectKey ? projName(projectKey) : null,
+    }
+  })
+
+  const closers = closerIds.map(id => ({
+    id, name: cards[id]?.display_name || 'Closer', photo_url: cards[id]?.photo_url || null,
+    projects: [...(closerProjects.get(id) || [])],
+  }))
+
+  return res.status(200).json({ leads, closers, projects })
 }
